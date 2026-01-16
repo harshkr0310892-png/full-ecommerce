@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
@@ -79,6 +79,7 @@ export default function CustomerProfile() {
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [returns, setReturns] = useState<any[]>([]); // Type should match your returns table
+  const [activeTab, setActiveTab] = useState<'orders' | 'returns' | 'chatbot'>('orders');
   const [editForm, setEditForm] = useState({
     full_name: '',
     phone: '',
@@ -689,142 +690,377 @@ export default function CustomerProfile() {
             </Dialog>
           </div>
 
-          {/* Order History */}
-          <div className="animate-fade-in stagger-2">
-            <h2 className="font-display text-xl font-semibold mb-4 flex items-center gap-2">
-              <Package className="w-5 h-5 text-primary" />
-              Order History
-            </h2>
-
-            {orders.length === 0 ? (
-              <div className="bg-card rounded-xl border border-border/50 p-12 text-center">
-                <Package className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-                <h3 className="font-display text-lg font-semibold mb-2">No Orders Yet</h3>
-                <p className="text-muted-foreground mb-4">
-                  You haven't placed any orders yet. Start shopping!
-                </p>
-                <Button variant="royal" onClick={() => navigate('/products')}>
-                  <Crown className="w-4 h-4 mr-2" /> Browse Products
-                </Button>
+          {/* Sidebar Navigation */}
+          <div className="flex flex-col lg:flex-row gap-6 mt-8">
+            {/* Sidebar */}
+            <div className="lg:w-1/4">
+              <div className="bg-card rounded-xl border border-border/50 p-4 sticky top-4">
+                <nav className="flex flex-col space-y-2">
+                  <button
+                    className={`w-full text-left px-4 py-3 rounded-lg transition-colors flex items-center gap-3 ${activeTab === 'orders' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
+                    onClick={() => setActiveTab('orders')}
+                  >
+                    <Package className="w-5 h-5" />
+                    <span>Order History</span>
+                  </button>
+                  <button
+                    className={`w-full text-left px-4 py-3 rounded-lg transition-colors flex items-center gap-3 ${activeTab === 'returns' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
+                    onClick={() => setActiveTab('returns')}
+                  >
+                    <Package className="w-5 h-5" />
+                    <span>Return History</span>
+                  </button>
+                  <button
+                    className={`w-full text-left px-4 py-3 rounded-lg transition-colors flex items-center gap-3 ${activeTab === 'chatbot' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
+                    onClick={() => setActiveTab('chatbot')}
+                  >
+                    <span className="text-xl">💬</span>
+                    <span>AI Assistant</span>
+                  </button>
+                </nav>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {orders.map((order) => {
-                  const status = statusConfig[order.status] || statusConfig.pending;
-                  const isExpanded = expandedOrders[order.id] || false;
-                  
-                  const toggleOrder = (orderId: string) => {
-                    setExpandedOrders(prev => ({
-                      ...prev,
-                      [orderId]: !prev[orderId]
-                    }));
-                  };
-                  
-                  return (
-                    <div
-                      key={order.id}
-                      className="bg-card rounded-lg border border-border/60 shadow-sm hover:shadow-md transition-shadow"
-                    >
-                      {/* Collapsed View */}
-                      <div className="p-4 md:p-6" onClick={() => toggleOrder(order.id)}>
-                        <div className="flex flex-col gap-3">
+            </div>
+
+            {/* Main Content Area */}
+            <div className="lg:w-3/4">
+              {activeTab === 'orders' && (
+                <div className="animate-fade-in">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Package className="w-6 h-6 text-primary" />
+                    <h2 className="font-display text-2xl font-semibold">Order History</h2>
+                  </div>
+
+                  {orders.length === 0 ? (
+                    <div className="bg-card rounded-xl border border-border/50 p-12 text-center">
+                      <Package className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+                      <h3 className="font-display text-lg font-semibold mb-2">No Orders Yet</h3>
+                      <p className="text-muted-foreground mb-4">
+                        You haven't placed any orders yet. Start shopping!
+                      </p>
+                      <Button variant="royal" onClick={() => navigate('/products')}>
+                        <Crown className="w-4 h-4 mr-2" /> Browse Products
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {orders.map((order) => {
+                        const status = statusConfig[order.status] || statusConfig.pending;
+                        const isExpanded = expandedOrders[order.id] || false;
+                        
+                        const toggleOrder = (orderId: string) => {
+                          setExpandedOrders(prev => ({
+                            ...prev,
+                            [orderId]: !prev[orderId]
+                          }));
+                        };
+                        
+                        return (
+                          <div
+                            key={order.id}
+                            className="bg-card rounded-lg border border-border/60 shadow-sm hover:shadow-md transition-shadow"
+                          >
+                            {/* Collapsed View */}
+                            <div className="p-4 md:p-6" onClick={() => toggleOrder(order.id)}>
+                              <div className="flex flex-col gap-3">
+                                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="font-display font-semibold text-primary">
+                                        {order.order_id}
+                                      </span>
+                                      <span
+                                        className={cn(
+                                          "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border border-border bg-muted/40",
+                                          status.color
+                                        )}
+                                      >
+                                        {status.icon}
+                                        {status.label}
+                                      </span>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                      {new Date(order.created_at).toLocaleDateString('en-IN', {
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric',
+                                      })}
+                                    </p>
+                                  </div>
+
+                                  <div className="flex flex-col md:items-end gap-2">
+                                    <div className="text-lg font-bold tabular-nums">
+                                      ₹{Number(order.total).toFixed(2)}
+                                    </div>
+
+                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                      <Button
+                                        variant="royalOutline"
+                                        size="sm"
+                                        onClick={() => navigate(`/track-order?id=${order.order_id}`)}
+                                      >
+                                        Track
+                                      </Button>
+
+                                      {/* Return button for delivered orders */}
+                                      {order.status === 'delivered' && !order.return_status && (
+                                        <ReturnOrderButton 
+                                          order={order} 
+                                          profile={profile} 
+                                          onReturnRequest={() => {
+                                            const userId = profile?.user_id || '';
+                                            loadOrders(userId, userEmail);
+                                            loadReturns(userId);
+                                          }} 
+                                        />
+                                      )}
+
+                                      {order.return_status && (
+                                        <span className={cn(
+                                          "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border",
+                                          order.return_status === 'requested' ? 'border-blue-200 bg-blue-50 text-blue-700' :
+                                          order.return_status === 'approved' ? 'border-green-200 bg-green-50 text-green-700' :
+                                          order.return_status === 'rejected' ? 'border-red-200 bg-red-50 text-red-700' :
+                                          order.return_status === 'refunded' ? 'border-green-200 bg-green-50 text-green-700' :
+                                          'border-gray-200 bg-gray-50 text-gray-700'
+                                        )}>
+                                          Return: {order.return_status.charAt(0).toUpperCase() + order.return_status.slice(1)}
+                                        </span>
+                                      )}
+
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="gap-1"
+                                        onClick={() => toggleOrder(order.id)}
+                                      >
+                                        {isExpanded ? 'Hide' : 'Details'}
+                                        {isExpanded ? (
+                                          <ChevronUp className="w-4 h-4" />
+                                        ) : (
+                                          <ChevronDown className="w-4 h-4" />
+                                        )}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Order Summary - Always visible */}
+                                <div className="rounded-md border border-border/50 bg-muted/10">
+                                  <div className="px-4 py-2 border-b border-border/50 text-xs font-medium text-muted-foreground">
+                                    Items
+                                  </div>
+                                  <div className="p-4 space-y-3">
+                                    {order.items && order.items.length > 0 ? (
+                                      <>
+                                        {order.items.slice(0, 2).map((item, idx) => (
+                                          <div key={idx} className="flex items-center gap-3">
+                                            {item.product_image && (
+                                              <img
+                                                src={item.product_image}
+                                                alt={item.product_name}
+                                                className="w-10 h-10 object-cover rounded-md border border-border/50"
+                                                onError={(e) => {
+                                                  const target = e.target as HTMLImageElement;
+                                                  target.style.display = 'none';
+                                                  const fallback = target.parentElement?.querySelector('.image-fallback');
+                                                  if (fallback) {
+                                                    (fallback as HTMLElement).style.display = 'block';
+                                                  }
+                                                }}
+                                              />
+                                            )}
+                                            <div className="min-w-0 flex-1">
+                                              <p className="font-medium text-sm truncate">{item.product_name}</p>
+                                              <p className="text-muted-foreground text-xs">Qty: {item.quantity}</p>
+                                            </div>
+                                            <div className="text-right text-sm tabular-nums">
+                                              ₹{Number(item.product_price).toFixed(2)}
+                                            </div>
+                                          </div>
+                                        ))}
+                                        {order.items.length > 2 && (
+                                          <p className="text-xs text-muted-foreground">
+                                            +{order.items.length - 2} more item{order.items.length - 2 === 1 ? '' : 's'}
+                                          </p>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <p className="text-sm text-muted-foreground">No items found for this order.</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Expanded View */}
+                            {isExpanded && (
+                              <div className="p-4 md:p-6 pt-0 md:pt-0 border-t border-border/50 mt-4 md:mt-0">
+                                {/* Order Details */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                  {/* Delivery Address */}
+                                  <div className="border border-border/50 rounded-lg p-4">
+                                    <h4 className="font-semibold mb-2 text-sm text-muted-foreground">Delivery Address</h4>
+                                    <p className="font-medium">{order.customer_name}</p>
+                                    <p className="text-muted-foreground">{order.customer_phone}</p>
+                                    <p className="mt-1">{order.customer_address}</p>
+                                    {order.customer_address?.includes('Landmarks:') && (
+                                      <div className="mt-2">
+                                        <p className="text-sm text-muted-foreground">Landmarks:</p>
+                                        <ul className="list-disc list-inside text-sm text-muted-foreground">
+                                          {order.customer_address
+                                            .split('Landmarks:')[1]
+                                            ?.split('•')
+                                            .filter(item => item.trim())
+                                            .map((item, idx) => (
+                                              <li key={idx}>{item.trim()}</li>
+                                            ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Order Summary with Total */}
+                                  <div className="border border-border/50 rounded-lg p-4">
+                                    <h4 className="font-semibold mb-2 text-sm text-muted-foreground">Order Summary</h4>
+                                    <div className="space-y-3">
+                                      {order.items && order.items.length > 0 && order.items.map((item, idx) => (
+                                        <div key={idx} className="flex items-center gap-3">
+                                          {item.product_image && (
+                                            <img 
+                                              src={item.product_image} 
+                                              alt={item.product_name}
+                                              className="w-12 h-12 object-cover rounded-lg border border-border/50"
+                                              onError={(e) => {
+                                                const target = e.target as HTMLImageElement;
+                                                target.style.display = 'none';
+                                                const fallback = target.parentElement?.querySelector('.image-fallback');
+                                                if (fallback) {
+                                                  (fallback as HTMLElement).style.display = 'block';
+                                                }
+                                              }}
+                                            />
+                                          )}
+                                          <div className="flex-1">
+                                            <p className="font-medium">{item.product_name}</p>
+                                            <p className="text-muted-foreground text-sm">Qty: {item.quantity}</p>
+                                          </div>
+                                          <div className="text-right">
+                                            <p>₹{Number(item.product_price).toFixed(2)}</p>
+                                            <p className="text-muted-foreground text-sm">₹{Number(item.product_price).toFixed(2)} each</p>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <div className="border-t border-border/50 mt-3 pt-3 font-semibold">
+                                      Total: ₹{Number(order.total).toFixed(2)}
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {/* Messages from Store */}
+                                {order.messages && order.messages.length > 0 && (
+                                  <div className="border-t border-border/50 pt-4">
+                                    <h4 className="font-semibold mb-2 text-sm text-muted-foreground">Messages from Store</h4>
+                                    <div className="space-y-2">
+                                      {order.messages.map((message, idx) => (
+                                        <div key={idx} className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                          <p className="text-sm text-black">{message.message}</p>
+                                          <p className="text-xs text-black mt-1">
+                                            {new Date(message.created_at).toLocaleString('en-IN', {
+                                              month: 'short',
+                                              day: 'numeric',
+                                              year: 'numeric',
+                                              hour: '2-digit',
+                                              minute: '2-digit'
+                                            })}
+                                          </p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'returns' && (
+                <div className="animate-fade-in">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Package className="w-6 h-6 text-primary" />
+                    <h2 className="font-display text-2xl font-semibold">Return History</h2>
+                  </div>
+
+                  {returns.length === 0 ? (
+                    <div className="bg-card rounded-xl border border-border/50 p-12 text-center">
+                      <Package className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+                      <h3 className="font-display text-lg font-semibold mb-2">No Returns Yet</h3>
+                      <p className="text-muted-foreground mb-4">
+                        You haven't initiated any returns yet.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {returns.map((ret) => (
+                        <div
+                          key={ret.id}
+                          className="bg-card rounded-lg border border-border/60 shadow-sm p-4 md:p-6"
+                        >
                           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="font-display font-semibold text-primary">
-                                  {order.order_id}
+                                  Return for Order: {ret.order_id}
                                 </span>
                                 <span
                                   className={cn(
-                                    "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border border-border bg-muted/40",
-                                    status.color
+                                    "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border",
+                                    ret.return_status === 'requested' ? 'border-blue-200 bg-blue-50 text-blue-700' :
+                                    ret.return_status === 'approved' ? 'border-green-200 bg-green-50 text-green-700' :
+                                    ret.return_status === 'rejected' ? 'border-red-200 bg-red-50 text-red-700' :
+                                    ret.return_status === 'refunded' ? 'border-green-200 bg-green-50 text-green-700' :
+                                    'border-gray-200 bg-gray-50 text-gray-700'
                                   )}
                                 >
-                                  {status.icon}
-                                  {status.label}
+                                  {ret.return_status.charAt(0).toUpperCase() + ret.return_status.slice(1)}
                                 </span>
                               </div>
                               <p className="text-sm text-muted-foreground mt-1">
-                                {new Date(order.created_at).toLocaleDateString('en-IN', {
+                                {new Date(ret.requested_at).toLocaleDateString('en-IN', {
                                   year: 'numeric',
                                   month: 'long',
                                   day: 'numeric',
                                 })}
                               </p>
-                            </div>
-
-                            <div className="flex flex-col md:items-end gap-2">
-                              <div className="text-lg font-bold tabular-nums">
-                                ₹{Number(order.total).toFixed(2)}
-                              </div>
-
-                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                <Button
-                                  variant="royalOutline"
-                                  size="sm"
-                                  onClick={() => navigate(`/track-order?id=${order.order_id}`)}
-                                >
-                                  Track
-                                </Button>
-
-                                {/* Return button for delivered orders */}
-                                {order.status === 'delivered' && !order.return_status && (
-                                  <ReturnOrderButton 
-                                    order={order} 
-                                    profile={profile} 
-                                    onReturnRequest={() => {
-                                      const userId = profile?.user_id || '';
-                                      loadOrders(userId, userEmail);
-                                      loadReturns(userId);
-                                    }} 
-                                  />
-                                )}
-
-                                {order.return_status && (
-                                  <span className={cn(
-                                    "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border",
-                                    order.return_status === 'requested' ? 'border-blue-200 bg-blue-50 text-blue-700' :
-                                    order.return_status === 'approved' ? 'border-green-200 bg-green-50 text-green-700' :
-                                    order.return_status === 'rejected' ? 'border-red-200 bg-red-50 text-red-700' :
-                                    order.return_status === 'refunded' ? 'border-green-200 bg-green-50 text-green-700' :
-                                    'border-gray-200 bg-gray-50 text-gray-700'
-                                  )}>
-                                    Return: {order.return_status.charAt(0).toUpperCase() + order.return_status.slice(1)}
-                                  </span>
-                                )}
-
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="gap-1"
-                                  onClick={() => toggleOrder(order.id)}
-                                >
-                                  {isExpanded ? 'Hide' : 'Details'}
-                                  {isExpanded ? (
-                                    <ChevronUp className="w-4 h-4" />
-                                  ) : (
-                                    <ChevronDown className="w-4 h-4" />
-                                  )}
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Order Summary - Always visible */}
-                          <div className="rounded-md border border-border/50 bg-muted/10">
-                            <div className="px-4 py-2 border-b border-border/50 text-xs font-medium text-muted-foreground">
-                              Items
-                            </div>
-                            <div className="p-4 space-y-3">
-                              {order.items && order.items.length > 0 ? (
-                                <>
-                                  {order.items.slice(0, 2).map((item, idx) => (
-                                    <div key={idx} className="flex items-center gap-3">
-                                      {item.product_image && (
-                                        <img
-                                          src={item.product_image}
-                                          alt={item.product_name}
-                                          className="w-10 h-10 object-cover rounded-md border border-border/50"
+                              <p className="text-sm mt-2">
+                                <span className="font-medium">Reason:</span> {ret.return_reason}
+                              </p>
+                              {ret.refund_amount && (
+                                <p className="text-sm">
+                                  <span className="font-medium">Refund Amount:</span> ₹{Number(ret.refund_amount).toFixed(2)}
+                                </p>
+                              )}
+                              {ret.images && ret.images.length > 0 && (
+                                <div className="mt-3">
+                                  <p className="text-sm font-medium mb-1">Return Images:</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {ret.images.slice(0, 4).map((image, idx) => (
+                                      <a 
+                                        key={idx}
+                                        href={image}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="block"
+                                      >
+                                        <img 
+                                          src={image}
+                                          alt={`Return image ${idx + 1}`}
+                                          className="w-16 h-16 object-cover rounded border"
                                           onError={(e) => {
                                             const target = e.target as HTMLImageElement;
                                             target.style.display = 'none';
@@ -834,232 +1070,348 @@ export default function CustomerProfile() {
                                             }
                                           }}
                                         />
-                                      )}
-                                      <div className="min-w-0 flex-1">
-                                        <p className="font-medium text-sm truncate">{item.product_name}</p>
-                                        <p className="text-muted-foreground text-xs">Qty: {item.quantity}</p>
+                                        <div className="image-fallback hidden absolute inset-0 bg-gray-200 flex items-center justify-center rounded">
+                                          <span className="text-xs text-gray-500">Img {idx + 1}</span>
+                                        </div>
+                                      </a>
+                                    ))}
+                                    {ret.images.length > 4 && (
+                                      <div className="flex items-center justify-center w-16 h-16 bg-gray-100 rounded border text-xs text-gray-500">
+                                        +{ret.images.length - 4}
                                       </div>
-                                      <div className="text-right text-sm tabular-nums">
-                                        ₹{Number(item.product_price).toFixed(2)}
-                                      </div>
-                                    </div>
-                                  ))}
-                                  {order.items.length > 2 && (
-                                    <p className="text-xs text-muted-foreground">
-                                      +{order.items.length - 2} more item{order.items.length - 2 === 1 ? '' : 's'}
-                                    </p>
-                                  )}
-                                </>
-                              ) : (
-                                <p className="text-sm text-muted-foreground">No items found for this order.</p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Expanded View */}
-                      {isExpanded && (
-                        <div className="p-4 md:p-6 pt-0 md:pt-0 border-t border-border/50 mt-4 md:mt-0">
-                          {/* Order Details */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                            {/* Delivery Address */}
-                            <div className="border border-border/50 rounded-lg p-4">
-                              <h4 className="font-semibold mb-2 text-sm text-muted-foreground">Delivery Address</h4>
-                              <p className="font-medium">{order.customer_name}</p>
-                              <p className="text-muted-foreground">{order.customer_phone}</p>
-                              <p className="mt-1">{order.customer_address}</p>
-                              {order.customer_address?.includes('Landmarks:') && (
-                                <div className="mt-2">
-                                  <p className="text-sm text-muted-foreground">Landmarks:</p>
-                                  <ul className="list-disc list-inside text-sm text-muted-foreground">
-                                    {order.customer_address
-                                      .split('Landmarks:')[1]
-                                      ?.split('•')
-                                      .filter(item => item.trim())
-                                      .map((item, idx) => (
-                                        <li key={idx}>{item.trim()}</li>
-                                      ))}
-                                  </ul>
-                                </div>
-                              )}
-                            </div>
-                            
-                            {/* Order Summary with Total */}
-                            <div className="border border-border/50 rounded-lg p-4">
-                              <h4 className="font-semibold mb-2 text-sm text-muted-foreground">Order Summary</h4>
-                              <div className="space-y-3">
-                                {order.items && order.items.length > 0 && order.items.map((item, idx) => (
-                                  <div key={idx} className="flex items-center gap-3">
-                                    {item.product_image && (
-                                      <img 
-                                        src={item.product_image} 
-                                        alt={item.product_name}
-                                        className="w-12 h-12 object-cover rounded-lg border border-border/50"
-                                        onError={(e) => {
-                                          const target = e.target as HTMLImageElement;
-                                          target.style.display = 'none';
-                                          const fallback = target.parentElement?.querySelector('.image-fallback');
-                                          if (fallback) {
-                                            (fallback as HTMLElement).style.display = 'block';
-                                          }
-                                        }}
-                                      />
                                     )}
-                                    <div className="flex-1">
-                                      <p className="font-medium">{item.product_name}</p>
-                                      <p className="text-muted-foreground text-sm">Qty: {item.quantity}</p>
-                                    </div>
-                                    <div className="text-right">
-                                      <p>₹{Number(item.product_price).toFixed(2)}</p>
-                                      <p className="text-muted-foreground text-sm">₹{Number(item.product_price).toFixed(2)} each</p>
-                                    </div>
                                   </div>
-                                ))}
-                              </div>
-                              <div className="border-t border-border/50 mt-3 pt-3 font-semibold">
-                                Total: ₹{Number(order.total).toFixed(2)}
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Messages from Store */}
-                          {order.messages && order.messages.length > 0 && (
-                            <div className="border-t border-border/50 pt-4">
-                              <h4 className="font-semibold mb-2 text-sm text-muted-foreground">Messages from Store</h4>
-                              <div className="space-y-2">
-                                {order.messages.map((message, idx) => (
-                                  <div key={idx} className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                                    <p className="text-sm text-black">{message.message}</p>
-                                    <p className="text-xs text-black mt-1">
-                                      {new Date(message.created_at).toLocaleString('en-IN', {
-                                        month: 'short',
-                                        day: 'numeric',
-                                        year: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                      })}
-                                    </p>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Return History */}
-          <div className="animate-fade-in stagger-2 mt-12">
-            <h2 className="font-display text-xl font-semibold mb-4 flex items-center gap-2">
-              <Package className="w-5 h-5 text-primary" />
-              Return History
-            </h2>
-
-            {returns.length === 0 ? (
-              <div className="bg-card rounded-xl border border-border/50 p-12 text-center">
-                <Package className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-                <h3 className="font-display text-lg font-semibold mb-2">No Returns Yet</h3>
-                <p className="text-muted-foreground mb-4">
-                  You haven't initiated any returns yet.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {returns.map((ret) => (
-                  <div
-                    key={ret.id}
-                    className="bg-card rounded-lg border border-border/60 shadow-sm p-4 md:p-6"
-                  >
-                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-display font-semibold text-primary">
-                            Return for Order: {ret.order_id}
-                          </span>
-                          <span
-                            className={cn(
-                              "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border",
-                              ret.return_status === 'requested' ? 'border-blue-200 bg-blue-50 text-blue-700' :
-                              ret.return_status === 'approved' ? 'border-green-200 bg-green-50 text-green-700' :
-                              ret.return_status === 'rejected' ? 'border-red-200 bg-red-50 text-red-700' :
-                              ret.return_status === 'refunded' ? 'border-green-200 bg-green-50 text-green-700' :
-                              'border-gray-200 bg-gray-50 text-gray-700'
-                            )}
-                          >
-                            {ret.return_status.charAt(0).toUpperCase() + ret.return_status.slice(1)}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {new Date(ret.requested_at).toLocaleDateString('en-IN', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                          })}
-                        </p>
-                        <p className="text-sm mt-2">
-                          <span className="font-medium">Reason:</span> {ret.return_reason}
-                        </p>
-                        {ret.refund_amount && (
-                          <p className="text-sm">
-                            <span className="font-medium">Refund Amount:</span> ₹{Number(ret.refund_amount).toFixed(2)}
-                          </p>
-                        )}
-                        {ret.images && ret.images.length > 0 && (
-                          <div className="mt-3">
-                            <p className="text-sm font-medium mb-1">Return Images:</p>
-                            <div className="flex flex-wrap gap-2">
-                              {ret.images.slice(0, 4).map((image, idx) => (
-                                <a 
-                                  key={idx}
-                                  href={image}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="block"
-                                >
-                                  <img 
-                                    src={image}
-                                    alt={`Return image ${idx + 1}`}
-                                    className="w-16 h-16 object-cover rounded border"
-                                    onError={(e) => {
-                                      const target = e.target as HTMLImageElement;
-                                      target.style.display = 'none';
-                                      const fallback = target.parentElement?.querySelector('.image-fallback');
-                                      if (fallback) {
-                                        (fallback as HTMLElement).style.display = 'block';
-                                      }
-                                    }}
-                                  />
-                                  <div className="image-fallback hidden absolute inset-0 bg-gray-200 flex items-center justify-center rounded">
-                                    <span className="text-xs text-gray-500">Img {idx + 1}</span>
-                                  </div>
-                                </a>
-                              ))}
-                              {ret.images.length > 4 && (
-                                <div className="flex items-center justify-center w-16 h-16 bg-gray-100 rounded border text-xs text-gray-500">
-                                  +{ret.images.length - 4}
                                 </div>
                               )}
                             </div>
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      ))}
                     </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'chatbot' && (
+                <div className="animate-fade-in">
+                  <div className="flex items-center gap-2 mb-6">
+                    <span className="text-2xl text-primary">💬</span>
+                    <h2 className="font-display text-2xl font-semibold">AI Assistant Chatbot</h2>
                   </div>
-                ))}
-              </div>
-            )}
+                  
+                  <div className="bg-card rounded-xl border border-border/50 p-6">
+                    <ChatbotComponent />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
     </Layout>
   );
 }
+
+// Chatbot Component
+const ChatbotComponent = () => {
+  const [messages, setMessages] = useState<Array<{id: string; text: string; sender: 'user' | 'bot'; timestamp: Date; imageUrl?: string}>>([
+    { id: '1', text: 'Hello! I\'m your friendly AI assistant. How can I help you today?', sender: 'bot', timestamp: new Date() }
+  ]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const handleSendMessage = async () => {
+    if ((!inputMessage.trim() && !uploadedImage) || isLoading) return;
+
+    let messageToSend = inputMessage;
+    
+    // If there's an uploaded image, include it in the message
+    if (uploadedImage) {
+      messageToSend = messageToSend + (messageToSend ? ' ' : '') + '[Attached image]';
+    }
+
+    // Add user message
+    const userMessage = {
+      id: Date.now().toString(),
+      text: messageToSend,
+      sender: 'user' as const,
+      timestamp: new Date(),
+      imageUrl: uploadedImage || undefined
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setInputMessage('');
+    setUploadedImage(null);
+    setIsLoading(true);
+
+    try {
+      // Prepare messages for API
+      const apiMessages = [
+        { role: 'system', content: 'You are a friendly AI assistant that can chat with customers, tell jokes, and provide helpful information. Be cheerful and engaging.', imageUrl: undefined },
+        ...messages.map(msg => ({
+          role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
+          content: msg.text,
+          imageUrl: msg.imageUrl
+        })),
+        { role: 'user', content: messageToSend, imageUrl: uploadedImage || undefined }
+      ];
+
+      // Dynamically import and instantiate the service
+      const { default: GeminiService } = await import('@/lib/sambanova');
+      const serviceInstance = new GeminiService();
+      
+      // Call Gemini API
+      const response = await serviceInstance.generateContent(apiMessages);
+      
+      const botResponse = response.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't process that. Could you try again?";
+      
+      // Add bot response
+      const botMessage = {
+        id: (Date.now() + 1).toString(),
+        text: botResponse,
+        sender: 'bot' as const,
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, botMessage]);
+    } catch (error) {
+      console.error('Error with chatbot:', error);
+      const errorMessage = {
+        id: (Date.now() + 1).toString(),
+        text: "Sorry, I'm having trouble connecting to the AI service right now. Please try again later.",
+        sender: 'bot' as const,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setUploadedImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const clearChat = () => {
+    setMessages([
+      { id: '1', text: 'Hello! I\'m your friendly AI assistant. How can I help you today?', sender: 'bot', timestamp: new Date() }
+    ]);
+    setUploadedImage(null);
+  };
+
+  const tellJoke = async () => {
+    if (isLoading) return;
+    
+    const jokeMessage = {
+      id: Date.now().toString(),
+      text: "Tell me a joke",
+      sender: 'user' as const,
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, jokeMessage]);
+    setIsLoading(true);
+
+    try {
+      const apiMessages = [
+        { role: 'system', content: 'You are a friendly AI assistant that loves to tell jokes. When asked, provide a funny joke.', imageUrl: undefined },
+        ...messages.map(msg => ({
+          role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
+          content: msg.text,
+          imageUrl: msg.imageUrl
+        })),
+        { role: 'user', content: 'Tell me a joke', imageUrl: undefined }
+      ];
+
+      // Dynamically import and instantiate the service
+      const { default: GeminiService } = await import('@/lib/sambanova');
+      const serviceInstance = new GeminiService();
+      
+      const response = await serviceInstance.generateContent(apiMessages);
+      
+      const jokeResponse = response.candidates?.[0]?.content?.parts?.[0]?.text || "Here's a joke: Why don't scientists trust atoms? Because they make up everything!";
+      
+      const botMessage = {
+        id: (Date.now() + 1).toString(),
+        text: jokeResponse,
+        sender: 'bot' as const,
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, botMessage]);
+    } catch (error) {
+      console.error('Error with chatbot joke:', error);
+      const errorMessage = {
+        id: (Date.now() + 1).toString(),
+        text: "Sorry, I'm having trouble connecting to the AI service right now. Please try again later.",
+        sender: 'bot' as const,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-[500px] max-w-4xl mx-auto">
+      {/* Chat header */}
+      <div className="flex justify-between items-center mb-4 pb-2 border-b border-border">
+        <div>
+          <h3 className="font-semibold text-lg">AI Assistant</h3>
+          <p className="text-xs text-muted-foreground mt-1">Note: Images are for context only. The AI analyzes text-based messages.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={tellJoke}
+            disabled={isLoading}
+            className="flex items-center gap-1"
+          >
+            <span>😄</span> Tell Joke
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={clearChat}
+            disabled={isLoading}
+            className="flex items-center gap-1"
+          >
+            <span>🗑️</span> Clear Chat
+          </Button>
+        </div>
+      </div>
+      
+      {/* Messages container */}
+      <div className="flex-1 overflow-y-auto mb-4 space-y-4 pr-2">
+        {messages.map((message) => (
+          <div 
+            key={message.id} 
+            className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
+            <div 
+              className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                message.sender === 'user' 
+                  ? 'bg-primary text-primary-foreground rounded-br-none' 
+                  : 'bg-muted text-foreground rounded-bl-none'
+              }`}
+            >
+              <div className="whitespace-pre-wrap break-words">{message.text}</div>
+              
+              {/* Show image if message contains image reference */}
+              {message.imageUrl && (
+                <div className="mt-2 flex justify-center">
+                  <img 
+                    src={message.imageUrl} 
+                    alt="Uploaded for chat" 
+                    className="max-h-32 max-w-xs object-contain rounded border border-border" 
+                  />
+                </div>
+              )}
+              
+              <div className={`text-xs mt-1 ${message.sender === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+          </div>
+        ))}
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="bg-muted text-foreground rounded-2xl rounded-bl-none px-4 py-2 max-w-[80%]">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-foreground rounded-full animate-bounce"></div>
+                <div className="h-2 w-2 bg-foreground rounded-full animate-bounce delay-75"></div>
+                <div className="h-2 w-2 bg-foreground rounded-full animate-bounce delay-150"></div>
+              </div>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+      
+      {/* Image preview */}
+      {uploadedImage && (
+        <div className="mb-3 flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Attached image:</span>
+          <div className="relative">
+            <img 
+              src={uploadedImage} 
+              alt="Preview" 
+              className="w-16 h-16 object-cover rounded border border-border" 
+            />
+            <button 
+              type="button" 
+              onClick={() => setUploadedImage(null)}
+              className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Input area */}
+      <div className="flex gap-2">
+        <div className="flex-1 flex gap-2">
+          <Input
+            type="text"
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            placeholder="Type your message..."
+            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+            disabled={isLoading}
+            className="flex-1"
+          />
+          <Button 
+            variant="outline" 
+            size="icon"
+            type="button"
+            disabled={isLoading}
+            className="h-10 w-10"
+            onClick={() => document.getElementById('chatbot-image-upload')?.click()}
+          >
+            <span>🖼️</span>
+          </Button>
+          <Input
+            id="chatbot-image-upload"
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            className="hidden"
+            disabled={isLoading}
+          />
+        </div>
+        <Button 
+          onClick={handleSendMessage} 
+          disabled={!inputMessage.trim() && !uploadedImage || isLoading}
+          className="min-w-[80px]"
+        >
+          {isLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : 'Send'}
+        </Button>
+      </div>
+    </div>
+  );
+};
 
 const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, profile: CustomerProfile | null, onReturnRequest: () => void }) => {
   const [open, setOpen] = useState(false);
