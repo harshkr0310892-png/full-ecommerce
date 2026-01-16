@@ -17,12 +17,337 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { 
-  Crown, Loader2, User, Phone, MapPin, Package, 
+  Crown, Home, Loader2, User, Phone, MapPin, Package, 
   Clock, CheckCircle, Truck, XCircle, LogOut, Camera,
-  Edit2, Save, X, ChevronDown, ChevronUp, Sparkles
+  Edit2, Save, X, ChevronDown, ChevronUp, Sparkles, Shield, Star
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+// Royal Premium Styles
+const royalStyles = `
+  /* Royal Premium Color Variables */
+  :root {
+    --royal-gold: linear-gradient(135deg, #D4AF37 0%, #FFD700 50%, #D4AF37 100%);
+    --royal-purple: linear-gradient(135deg, #4A0E4E 0%, #2D0A31 50%, #1A0620 100%);
+    --royal-burgundy: linear-gradient(135deg, #722F37 0%, #4A1C20 100%);
+    --royal-navy: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    --premium-shadow: 0 10px 40px rgba(212, 175, 55, 0.15);
+    --glass-bg: rgba(26, 26, 46, 0.85);
+    --gold-glow: 0 0 30px rgba(212, 175, 55, 0.3);
+  }
+
+  /* Royal Card Styling */
+  .royal-card {
+    background: linear-gradient(145deg, rgba(26, 26, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%);
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(212, 175, 55, 0.1);
+    backdrop-filter: blur(10px);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .royal-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #D4AF37, transparent);
+  }
+
+  /* Premium Avatar Ring */
+  .avatar-ring {
+    background: linear-gradient(135deg, #D4AF37 0%, #FFD700 25%, #D4AF37 50%, #FFD700 75%, #D4AF37 100%);
+    padding: 4px;
+    border-radius: 50%;
+    animation: shimmer 3s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+  }
+
+  /* Royal Button Styles */
+  .royal-btn {
+    background: linear-gradient(135deg, #D4AF37 0%, #B8860B 100%);
+    color: #1a1a2e;
+    font-weight: 600;
+    border: none;
+    box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .royal-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
+    background: linear-gradient(135deg, #FFD700 0%, #D4AF37 100%);
+  }
+
+  .royal-btn-outline {
+    background: transparent;
+    border: 2px solid rgba(212, 175, 55, 0.5);
+    color: #D4AF37;
+    font-weight: 600;
+    transition: all 0.3s ease;
+  }
+
+  .royal-btn-outline:hover {
+    background: rgba(212, 175, 55, 0.1);
+    border-color: #D4AF37;
+    box-shadow: 0 0 20px rgba(212, 175, 55, 0.2);
+  }
+
+  /* Navigation Tab Styles */
+  .nav-tab {
+    background: rgba(26, 26, 46, 0.6);
+    border: 1px solid rgba(212, 175, 55, 0.1);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .nav-tab::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: #D4AF37;
+    transform: scaleY(0);
+    transition: transform 0.3s ease;
+  }
+
+  .nav-tab:hover {
+    background: rgba(212, 175, 55, 0.08);
+    border-color: rgba(212, 175, 55, 0.3);
+  }
+
+  .nav-tab.active {
+    background: linear-gradient(90deg, rgba(212, 175, 55, 0.15) 0%, transparent 100%);
+    border-color: rgba(212, 175, 55, 0.4);
+  }
+
+  .nav-tab.active::after {
+    transform: scaleY(1);
+  }
+
+  /* Order Card Styles */
+  .order-card {
+    background: linear-gradient(145deg, rgba(30, 30, 50, 0.9) 0%, rgba(20, 25, 40, 0.9) 100%);
+    border: 1px solid rgba(212, 175, 55, 0.15);
+    transition: all 0.3s ease;
+    position: relative;
+  }
+
+  .order-card:hover {
+    border-color: rgba(212, 175, 55, 0.4);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3), 0 0 20px rgba(212, 175, 55, 0.1);
+    transform: translateY(-2px);
+  }
+
+  .order-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.4), transparent);
+  }
+
+  /* Status Badge Styles */
+  .status-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .status-pending {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.2) 0%, rgba(255, 152, 0, 0.2) 100%);
+    border: 1px solid rgba(255, 193, 7, 0.4);
+    color: #FFC107;
+  }
+
+  .status-confirmed {
+    background: linear-gradient(135deg, rgba(33, 150, 243, 0.2) 0%, rgba(3, 169, 244, 0.2) 100%);
+    border: 1px solid rgba(33, 150, 243, 0.4);
+    color: #42A5F5;
+  }
+
+  .status-processing {
+    background: linear-gradient(135deg, rgba(156, 39, 176, 0.2) 0%, rgba(142, 36, 170, 0.2) 100%);
+    border: 1px solid rgba(156, 39, 176, 0.4);
+    color: #BA68C8;
+  }
+
+  .status-shipped {
+    background: linear-gradient(135deg, rgba(63, 81, 181, 0.2) 0%, rgba(48, 63, 159, 0.2) 100%);
+    border: 1px solid rgba(63, 81, 181, 0.4);
+    color: #7986CB;
+  }
+
+  .status-delivered {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.2) 0%, rgba(56, 142, 60, 0.2) 100%);
+    border: 1px solid rgba(76, 175, 80, 0.4);
+    color: #66BB6A;
+  }
+
+  .status-cancelled {
+    background: linear-gradient(135deg, rgba(244, 67, 54, 0.2) 0%, rgba(211, 47, 47, 0.2) 100%);
+    border: 1px solid rgba(244, 67, 54, 0.4);
+    color: #EF5350;
+  }
+
+  /* Premium Input Styles */
+  .royal-input {
+    background: rgba(26, 26, 46, 0.8);
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    color: #f0f0f0;
+    transition: all 0.3s ease;
+  }
+
+  .royal-input:focus {
+    border-color: #D4AF37;
+    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+    outline: none;
+  }
+
+  .royal-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  /* Section Header Styles */
+  .section-header {
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.1) 0%, transparent 100%);
+    border-left: 3px solid #D4AF37;
+    padding: 12px 20px;
+    margin-bottom: 24px;
+  }
+
+  .section-header h2 {
+    background: linear-gradient(135deg, #D4AF37 0%, #FFD700 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Premium Scrollbar */
+  .royal-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .royal-scrollbar::-webkit-scrollbar-track {
+    background: rgba(26, 26, 46, 0.5);
+    border-radius: 3px;
+  }
+
+  .royal-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #D4AF37 0%, #B8860B 100%);
+    border-radius: 3px;
+  }
+
+  /* Chatbot Styles */
+  .chat-message-user {
+    background: linear-gradient(135deg, #D4AF37 0%, #B8860B 100%);
+    color: #1a1a2e;
+  }
+
+  .chat-message-bot {
+    background: rgba(45, 45, 70, 0.9);
+    border: 1px solid rgba(212, 175, 55, 0.2);
+  }
+
+  /* Loading Animation */
+  .royal-spinner {
+    border: 3px solid rgba(212, 175, 55, 0.2);
+    border-top-color: #D4AF37;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Decorative Crown Pattern */
+  .crown-pattern {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    opacity: 0.05;
+    font-size: 120px;
+    pointer-events: none;
+  }
+
+  /* Premium Gradient Text */
+  .gold-text {
+    background: linear-gradient(135deg, #D4AF37 0%, #FFD700 50%, #D4AF37 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Empty State Styling */
+  .empty-state {
+    background: radial-gradient(circle at center, rgba(212, 175, 55, 0.05) 0%, transparent 70%);
+  }
+
+  /* Floating Animation */
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+
+  .float-animation {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  /* Premium Badge */
+  .premium-badge {
+    background: linear-gradient(135deg, #D4AF37 0%, #FFD700 100%);
+    color: #1a1a2e;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 2px 10px rgba(212, 175, 55, 0.3);
+  }
+
+  /* Order Amount Display */
+  .order-amount {
+    font-family: 'Georgia', serif;
+    font-size: 1.5rem;
+    background: linear-gradient(135deg, #D4AF37 0%, #FFD700 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 700;
+  }
+
+  /* Dialog Premium Styling */
+  .royal-dialog {
+    background: linear-gradient(145deg, rgba(26, 26, 46, 0.98) 0%, rgba(22, 33, 62, 0.98) 100%);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5), 0 0 40px rgba(212, 175, 55, 0.1);
+  }
+`;
 
 interface CustomerProfile {
   id: string;
@@ -56,13 +381,13 @@ interface Order {
   }[];
 }
 
-const statusConfig: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
-  pending: { icon: <Clock className="w-4 h-4" />, color: "text-yellow-500", label: "Pending" },
-  confirmed: { icon: <CheckCircle className="w-4 h-4" />, color: "text-blue-500", label: "Confirmed" },
-  processing: { icon: <Package className="w-4 h-4" />, color: "text-purple-500", label: "Processing" },
-  shipped: { icon: <Truck className="w-4 h-4" />, color: "text-indigo-500", label: "Shipped" },
-  delivered: { icon: <CheckCircle className="w-4 h-4" />, color: "text-green-500", label: "Delivered" },
-  cancelled: { icon: <XCircle className="w-4 h-4" />, color: "text-red-500", label: "Cancelled" },
+const statusConfig: Record<string, { icon: React.ReactNode; color: string; label: string; className: string }> = {
+  pending: { icon: <Clock className="w-4 h-4" />, color: "text-yellow-500", label: "Pending", className: "status-pending" },
+  confirmed: { icon: <CheckCircle className="w-4 h-4" />, color: "text-blue-500", label: "Confirmed", className: "status-confirmed" },
+  processing: { icon: <Package className="w-4 h-4" />, color: "text-purple-500", label: "Processing", className: "status-processing" },
+  shipped: { icon: <Truck className="w-4 h-4" />, color: "text-indigo-500", label: "Shipped", className: "status-shipped" },
+  delivered: { icon: <CheckCircle className="w-4 h-4" />, color: "text-green-500", label: "Delivered", className: "status-delivered" },
+  cancelled: { icon: <XCircle className="w-4 h-4" />, color: "text-red-500", label: "Cancelled", className: "status-cancelled" },
 };
 
 export default function CustomerProfile() {
@@ -78,7 +403,7 @@ export default function CustomerProfile() {
   const [userEmail, setUserEmail] = useState('');
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [returns, setReturns] = useState<any[]>([]); // Type should match your returns table
+  const [returns, setReturns] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'orders' | 'returns' | 'chatbot'>('orders');
   const [editForm, setEditForm] = useState({
     full_name: '',
@@ -127,7 +452,6 @@ export default function CustomerProfile() {
         address: data.address || '',
       });
     } else {
-      // If no profile exists, create one
       console.log('No profile found, creating new profile');
       try {
         const { data: newProfile, error: insertError } = await supabase
@@ -158,7 +482,6 @@ export default function CustomerProfile() {
   };
 
   const loadOrders = async (userId: string, email: string) => {
-    // Load orders linked by user_id or email
     const { data, error } = await supabase
       .from('orders')
       .select('*')
@@ -170,19 +493,15 @@ export default function CustomerProfile() {
       return;
     }
 
-    // Load order items, messages, and other details for each order
     const ordersWithDetails = await Promise.all(
       (data || []).map(async (order) => {
-        // Load order items
         const { data: items } = await supabase
           .from('order_items')
           .select('product_name, quantity, product_price, product_id')
           .eq('order_id', order.id);
         
-        // Get product images for each item
         const itemsWithImages = await Promise.all(
           (items || []).map(async (item) => {
-            // Fetch product details to get image
             const { data: product } = await supabase
               .from('products')
               .select('image_url')
@@ -196,7 +515,6 @@ export default function CustomerProfile() {
           })
         );
         
-        // Load order messages
         const { data: messages } = await supabase
           .from('order_messages')
           .select('*')
@@ -216,7 +534,6 @@ export default function CustomerProfile() {
 
   const loadReturns = async (userId: string) => {
     try {
-      // First get the order IDs for this user
       const { data: userOrders, error: ordersError } = await supabase
         .from('orders')
         .select('id')
@@ -231,7 +548,6 @@ export default function CustomerProfile() {
         return;
       }
       
-      // Load returns for these orders
       const { data: returnsData, error } = await supabase
         .from('returns')
         .select('*')
@@ -243,7 +559,6 @@ export default function CustomerProfile() {
       setReturns(returnsData || []);
     } catch (error) {
       console.error('Error loading returns:', error);
-      // Still initialize with empty array even if there's an error
       setReturns([]);
     }
   };
@@ -277,7 +592,6 @@ export default function CustomerProfile() {
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     console.log('handleAvatarUpload called');
-    // Check authentication first
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       toast.error('You must be logged in to upload a photo');
@@ -286,103 +600,68 @@ export default function CustomerProfile() {
     }
     
     if (!e.target.files || !e.target.files[0]) {
-      console.log('No file selected', {
-        hasFile: !!(e.target.files && e.target.files[0]),
-        hasProfile: !!profile
-      });
       toast.error('Please select an image file');
       return;
     }
     
     if (!profile) {
-      console.log('Profile not loaded yet', {
-        hasFile: !!(e.target.files && e.target.files[0]),
-        hasProfile: !!profile
-      });
       toast.error('Profile not loaded. Please wait and try again.');
       return;
     }
 
     const file = e.target.files[0];
-    console.log('File selected:', file.name, file.size, file.type);
     
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('Please select an image file');
-      console.log('Invalid file type:', file.type);
       return;
     }
     
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('File size should be less than 5MB');
-      console.log('File too large:', file.size);
       return;
     }
     
     const fileExt = file.name.split('.').pop()?.toLowerCase();
     if (!fileExt || !['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExt)) {
       toast.error('Only JPG, PNG, GIF, and WebP files are allowed');
-      console.log('Invalid file extension:', fileExt);
       return;
     }
     
     const fileName = `${profile.user_id}.${fileExt}`;
-    console.log('Generated file name:', fileName);
 
     setUploading(true);
     try {
-      // First, delete existing file if it exists (to replace with new one)
       try {
-        console.log('Attempting to remove existing file:', fileName);
         await supabase.storage
           .from('customer-avatars')
           .remove([fileName]);
-        console.log('Successfully removed existing file');
       } catch (removeError) {
         console.log('No existing file to remove or remove failed:', removeError);
-        // Continue with upload even if remove fails
       }
       
-      // Upload to storage
-      console.log('Attempting to upload file:', fileName);
       const { data, error: uploadError } = await supabase.storage
         .from('customer-avatars')
         .upload(fileName, file, { upsert: true });
 
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        throw uploadError;
-      }
-      
-      console.log('Upload successful:', data);
+      if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: urlData } = supabase.storage
         .from('customer-avatars')
         .getPublicUrl(fileName, { transform: null });
-      
-      console.log('Public URL data:', urlData);
       
       if (!urlData?.publicUrl) {
         throw new Error('Failed to generate public URL');
       }
 
-      // Update profile
-      console.log('Updating profile with avatar URL:', urlData.publicUrl);
       const { error: updateError } = await supabase
         .from('customer_profiles')
         .update({ avatar_url: urlData.publicUrl })
         .eq('id', profile.id);
 
-      if (updateError) {
-        console.error('Profile update error:', updateError);
-        throw updateError;
-      }
+      if (updateError) throw updateError;
 
       setProfile({ ...profile, avatar_url: urlData.publicUrl });
       toast.success('Profile photo updated!');
-      console.log('Profile updated successfully');
     } catch (error: any) {
       console.error('Error uploading avatar:', error);
       toast.error(error?.message || 'Failed to upload photo');
@@ -482,8 +761,17 @@ export default function CustomerProfile() {
   if (loading) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-20 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <style>{royalStyles}</style>
+        <div 
+          className="min-h-screen flex items-center justify-center"
+          style={{
+            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)'
+          }}
+        >
+          <div className="text-center">
+            <div className="w-16 h-16 royal-spinner mx-auto mb-4"></div>
+            <p className="gold-text text-lg font-medium">Loading your royal experience...</p>
+          </div>
         </div>
       </Layout>
     );
@@ -491,294 +779,389 @@ export default function CustomerProfile() {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-4xl mx-auto">
-          {/* Profile Header */}
-          <div className="bg-card rounded-xl border border-border/50 p-6 mb-8 animate-fade-in">
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-              {/* Avatar */}
-              <div className="relative group">
-                <div className="w-24 h-24 rounded-full overflow-hidden bg-muted flex items-center justify-center border-4 border-primary/20">
-                  {profile?.avatar_url ? (
-                    <div className="relative w-full h-full">
-                      <img 
-                        src={profile.avatar_url} 
-                        alt="Profile" 
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          // If image fails to load, hide the img and show the fallback User icon
-                          e.currentTarget.style.display = 'none';
-                          const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
-                          if (fallback) {
-                            (fallback as HTMLElement).style.display = 'block';
-                          }
-                        }}
-                      />
-                      <User 
-                        className="w-10 h-10 text-muted-foreground absolute inset-0 m-auto avatar-fallback" 
-                        style={{display: 'none'}} 
-                      />
-                    </div>
-                  ) : (
-                    <User className="w-10 h-10 text-muted-foreground" />
-                  )}
-                </div>
-                <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                  {uploading ? (
-                    <Loader2 className="w-6 h-6 text-white animate-spin" />
-                  ) : (
-                    <Camera className="w-6 h-6 text-white" />
-                  )}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
-                    onChange={handleAvatarUpload}
-                    className="hidden"
-                    disabled={uploading}
-                  />
-                </label>
+      <style>{royalStyles}</style>
+      <div 
+        className="min-h-screen py-12"
+        style={{
+          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)'
+        }}
+      >
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto">
+            
+            {/* Profile Header Card */}
+            <div 
+              className="royal-card rounded-2xl p-8 mb-8 animate-fade-in relative"
+              style={{ overflow: 'visible' }}
+            >
+              {/* Decorative Crown */}
+              <div className="crown-pattern">
+                <Crown className="w-32 h-32" />
+              </div>
+              
+              {/* Premium Member Badge */}
+              <div className="absolute -top-3 left-8">
+                <span className="premium-badge">
+                  <Crown className="w-3 h-3" /> Premium Member
+                </span>
               </div>
 
-              {/* Info */}
-              <div className="flex-1">
-                <h1 className="font-display text-2xl font-bold mb-1">
-                  {profile?.full_name || 'Customer'}
-                </h1>
-                <p className="text-muted-foreground">{userEmail}</p>
-                {profile?.phone && (
-                  <p className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
-                    <Phone className="w-4 h-4" /> {profile.phone}
-                  </p>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-2">
-                {isEditing ? (
-                  <>
-                    <Button
-                      variant="royalOutline"
-                      size="sm"
-                      onClick={() => setIsEditing(false)}
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-8 relative z-10">
+                {/* Avatar with Gold Ring */}
+                <div className="relative group">
+                  <div className="avatar-ring">
+                    <div 
+                      className="w-28 h-28 rounded-full overflow-hidden flex items-center justify-center"
+                      style={{ background: 'linear-gradient(145deg, #1a1a2e 0%, #2a2a4e 100%)' }}
                     >
-                      <X className="w-4 h-4 mr-1" /> Cancel
-                    </Button>
-                    <Button
-                      variant="royal"
-                      size="sm"
-                      onClick={handleSaveProfile}
-                      disabled={saving}
-                    >
-                      {saving ? (
-                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      {profile?.avatar_url ? (
+                        <img 
+                          src={profile.avatar_url} 
+                          alt="Profile" 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
+                            if (fallback) {
+                              (fallback as HTMLElement).style.display = 'flex';
+                            }
+                          }}
+                        />
                       ) : (
-                        <Save className="w-4 h-4 mr-1" />
+                        <User className="w-12 h-12 text-amber-400/50" />
                       )}
-                      Save
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      variant="royalOutline"
-                      size="sm"
-                      onClick={() => setAiAvatarOpen(true)}
-                    >
-                      <Sparkles className="w-4 h-4 mr-1" /> AI Avatar
-                    </Button>
-                    <Button
-                      variant="royalOutline"
-                      size="sm"
-                      onClick={() => setIsEditing(true)}
-                    >
-                      <Edit2 className="w-4 h-4 mr-1" /> Edit
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleLogout}
-                      className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                    >
-                      <LogOut className="w-4 h-4 mr-1" /> Logout
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Edit Form */}
-            {isEditing && (
-              <div className="mt-6 pt-6 border-t border-border grid gap-4 md:grid-cols-2">
-                <div>
-                  <Label htmlFor="edit_name">Full Name</Label>
-                  <Input
-                    id="edit_name"
-                    value={editForm.full_name}
-                    onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                    placeholder="Enter your full name"
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit_phone">Phone Number</Label>
-                  <Input
-                    id="edit_phone"
-                    value={editForm.phone}
-                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                    placeholder="Enter your phone number"
-                    className="mt-1"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <Label htmlFor="edit_address">Address</Label>
-                  <Textarea
-                    id="edit_address"
-                    value={editForm.address}
-                    onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                    placeholder="Enter your address"
-                    className="mt-1"
-                    rows={3}
-                  />
-                </div>
-              </div>
-            )}
-
-            <Dialog open={aiAvatarOpen} onOpenChange={setAiAvatarOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Generate AI Avatar</DialogTitle>
-                  <DialogDescription>
-                    Describe the avatar you want (example: “classic royal gentleman with short hair, blue background”).
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="space-y-2">
-                  <Label htmlFor="ai_avatar_prompt">Avatar description</Label>
-                  <Textarea
-                    id="ai_avatar_prompt"
-                    value={aiAvatarPrompt}
-                    onChange={(e) => setAiAvatarPrompt(e.target.value)}
-                    placeholder="Describe your avatar..."
-                    rows={4}
-                    disabled={aiAvatarLoading}
-                  />
-                </div>
-
-                <DialogFooter>
-                  <Button
-                    variant="ghost"
-                    onClick={() => setAiAvatarOpen(false)}
-                    disabled={aiAvatarLoading}
+                      <div 
+                        className="avatar-fallback hidden w-full h-full items-center justify-center"
+                        style={{ display: 'none' }}
+                      >
+                        <User className="w-12 h-12 text-amber-400/50" />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Camera Upload Overlay */}
+                  <label 
+                    className="absolute inset-0 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 cursor-pointer"
+                    style={{ background: 'rgba(0,0,0,0.7)' }}
                   >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="royal"
-                    onClick={handleGenerateAiAvatar}
-                    disabled={aiAvatarLoading || aiAvatarPrompt.trim().length < 3}
-                  >
-                    {aiAvatarLoading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating
-                      </>
+                    {uploading ? (
+                      <div className="w-8 h-8 royal-spinner"></div>
                     ) : (
-                      'Generate'
+                      <Camera className="w-8 h-8 text-amber-400" />
                     )}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                      onChange={handleAvatarUpload}
+                      className="hidden"
+                      disabled={uploading}
+                    />
+                  </label>
+                </div>
 
-          {/* Sidebar Navigation */}
-          <div className="flex flex-col lg:flex-row gap-6 mt-8">
-            {/* Sidebar */}
-            <div className="lg:w-1/4">
-              <div className="bg-card rounded-xl border border-border/50 p-4 sticky top-4">
-                <nav className="flex flex-col space-y-2">
-                  <button
-                    className={`w-full text-left px-4 py-3 rounded-lg transition-colors flex items-center gap-3 ${activeTab === 'orders' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
-                    onClick={() => setActiveTab('orders')}
+                {/* User Info */}
+                <div className="flex-1">
+                  <h1 
+                    className="font-display text-3xl font-bold mb-2"
+                    style={{
+                      background: 'linear-gradient(135deg, #D4AF37 0%, #FFD700 50%, #D4AF37 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                    }}
                   >
-                    <Package className="w-5 h-5" />
-                    <span>Order History</span>
-                  </button>
-                  <button
-                    className={`w-full text-left px-4 py-3 rounded-lg transition-colors flex items-center gap-3 ${activeTab === 'returns' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
-                    onClick={() => setActiveTab('returns')}
-                  >
-                    <Package className="w-5 h-5" />
-                    <span>Return History</span>
-                  </button>
-                  <button
-                    className={`w-full text-left px-4 py-3 rounded-lg transition-colors flex items-center gap-3 ${activeTab === 'chatbot' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
-                    onClick={() => setActiveTab('chatbot')}
-                  >
-                    <span className="text-xl">💬</span>
-                    <span>AI Assistant</span>
-                  </button>
-                </nav>
+                    {profile?.full_name || 'Royal Customer'}
+                  </h1>
+                  <p className="text-gray-400 mb-2">{userEmail}</p>
+                  {profile?.phone && (
+                    <p className="text-sm text-gray-400 flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-amber-400/60" /> {profile.phone}
+                    </p>
+                  )}
+                  {profile?.address && (
+                    <p className="text-sm text-gray-400 flex items-center gap-2 mt-1">
+                      <MapPin className="w-4 h-4 text-amber-400/60" /> {profile.address}
+                    </p>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-wrap gap-3">
+                  {isEditing ? (
+                    <>
+                      <button
+                        className="royal-btn-outline px-4 py-2 rounded-lg flex items-center gap-2 text-sm"
+                        onClick={() => setIsEditing(false)}
+                      >
+                        <X className="w-4 h-4" /> Cancel
+                      </button>
+                      <button
+                        className="royal-btn px-4 py-2 rounded-lg flex items-center gap-2 text-sm"
+                        onClick={handleSaveProfile}
+                        disabled={saving}
+                      >
+                        {saving ? (
+                          <div className="w-4 h-4 royal-spinner"></div>
+                        ) : (
+                          <Save className="w-4 h-4" />
+                        )}
+                        Save
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        className="royal-btn-outline px-4 py-2 rounded-lg flex items-center gap-2 text-sm"
+                        onClick={() => setIsEditing(true)}
+                      >
+                        <Edit2 className="w-4 h-4" /> Edit Profile
+                      </button>
+                      <button
+                        className="px-4 py-2 rounded-lg flex items-center gap-2 text-sm text-amber-400 border border-amber-400/30 hover:bg-amber-400/10 transition-all"
+                        onClick={() => navigate('/')}
+                      >
+                        <Home className="w-4 h-4" /> Back Home
+                      </button>
+                      <button
+                        className="px-4 py-2 rounded-lg flex items-center gap-2 text-sm text-red-400 border border-red-400/30 hover:bg-red-400/10 transition-all"
+                        onClick={handleLogout}
+                      >
+                        <LogOut className="w-4 h-4" /> Logout
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
+
+              {/* Edit Form */}
+              {isEditing && (
+                <div 
+                  className="mt-8 pt-8 border-t border-amber-400/20 grid gap-6 md:grid-cols-2"
+                >
+                  <div>
+                    <Label htmlFor="edit_name" className="text-amber-400/80 text-sm mb-2 block">Full Name</Label>
+                    <input
+                      id="edit_name"
+                      value={editForm.full_name}
+                      onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                      placeholder="Enter your full name"
+                      className="royal-input w-full px-4 py-3 rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit_phone" className="text-amber-400/80 text-sm mb-2 block">Phone Number</Label>
+                    <input
+                      id="edit_phone"
+                      value={editForm.phone}
+                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                      placeholder="Enter your phone number"
+                      className="royal-input w-full px-4 py-3 rounded-lg"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label htmlFor="edit_address" className="text-amber-400/80 text-sm mb-2 block">Address</Label>
+                    <textarea
+                      id="edit_address"
+                      value={editForm.address}
+                      onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                      placeholder="Enter your address"
+                      className="royal-input w-full px-4 py-3 rounded-lg resize-none"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* AI Avatar Dialog */}
+              <Dialog open={aiAvatarOpen} onOpenChange={setAiAvatarOpen}>
+                <DialogContent className="royal-dialog border-amber-400/30">
+                  <DialogHeader>
+                    <DialogTitle className="gold-text text-xl flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-amber-400" /> Generate AI Avatar
+                    </DialogTitle>
+                    <DialogDescription className="text-gray-400">
+                      Describe the avatar you want (example: "classic royal gentleman with short hair, blue background").
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="ai_avatar_prompt" className="text-amber-400/80">Avatar description</Label>
+                    <textarea
+                      id="ai_avatar_prompt"
+                      value={aiAvatarPrompt}
+                      onChange={(e) => setAiAvatarPrompt(e.target.value)}
+                      placeholder="Describe your avatar..."
+                      rows={4}
+                      disabled={aiAvatarLoading}
+                      className="royal-input w-full px-4 py-3 rounded-lg resize-none"
+                    />
+                  </div>
+
+                  <DialogFooter className="gap-3">
+                    <button
+                      className="royal-btn-outline px-4 py-2 rounded-lg"
+                      onClick={() => setAiAvatarOpen(false)}
+                      disabled={aiAvatarLoading}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="royal-btn px-4 py-2 rounded-lg flex items-center gap-2"
+                      onClick={handleGenerateAiAvatar}
+                      disabled={aiAvatarLoading || aiAvatarPrompt.trim().length < 3}
+                    >
+                      {aiAvatarLoading ? (
+                        <>
+                          <div className="w-4 h-4 royal-spinner"></div> Generating
+                        </>
+                      ) : (
+                        'Generate'
+                      )}
+                    </button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
 
             {/* Main Content Area */}
-            <div className="lg:w-3/4">
-              {activeTab === 'orders' && (
-                <div className="animate-fade-in">
-                  <div className="flex items-center gap-2 mb-6">
-                    <Package className="w-6 h-6 text-primary" />
-                    <h2 className="font-display text-2xl font-semibold">Order History</h2>
+            <div className="flex flex-col lg:flex-row gap-8">
+              {/* Sidebar Navigation */}
+              <div className="lg:w-1/4">
+                <div 
+                  className="royal-card rounded-xl p-4 sticky top-4"
+                >
+                  <div className="mb-4 pb-4 border-b border-amber-400/10">
+                    <h3 className="text-amber-400/80 text-xs font-semibold uppercase tracking-wider">Navigation</h3>
                   </div>
+                  <nav className="flex flex-col space-y-2">
+                    <button
+                      className={cn(
+                        "nav-tab w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 text-gray-300 font-medium",
+                        activeTab === 'orders' && 'active text-amber-400'
+                      )}
+                      onClick={() => setActiveTab('orders')}
+                    >
+                      <Package className="w-5 h-5" />
+                      <span>Order History</span>
+                      {orders.length > 0 && (
+                        <span 
+                          className="ml-auto text-xs px-2 py-0.5 rounded-full"
+                          style={{ 
+                            background: 'rgba(212, 175, 55, 0.2)', 
+                            color: '#D4AF37' 
+                          }}
+                        >
+                          {orders.length}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      className={cn(
+                        "nav-tab w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 text-gray-300 font-medium",
+                        activeTab === 'returns' && 'active text-amber-400'
+                      )}
+                      onClick={() => setActiveTab('returns')}
+                    >
+                      <Shield className="w-5 h-5" />
+                      <span>Return History</span>
+                      {returns.length > 0 && (
+                        <span 
+                          className="ml-auto text-xs px-2 py-0.5 rounded-full"
+                          style={{ 
+                            background: 'rgba(212, 175, 55, 0.2)', 
+                            color: '#D4AF37' 
+                          }}
+                        >
+                          {returns.length}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      className={cn(
+                        "nav-tab w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 text-gray-300 font-medium",
+                        activeTab === 'chatbot' && 'active text-amber-400'
+                      )}
+                      onClick={() => setActiveTab('chatbot')}
+                    >
+                      <Sparkles className="w-5 h-5" />
+                      <span>AI Assistant</span>
+                    </button>
+                  </nav>
+                </div>
+              </div>
 
-                  {orders.length === 0 ? (
-                    <div className="bg-card rounded-xl border border-border/50 p-12 text-center">
-                      <Package className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-                      <h3 className="font-display text-lg font-semibold mb-2">No Orders Yet</h3>
-                      <p className="text-muted-foreground mb-4">
-                        You haven't placed any orders yet. Start shopping!
-                      </p>
-                      <Button variant="royal" onClick={() => navigate('/products')}>
-                        <Crown className="w-4 h-4 mr-2" /> Browse Products
-                      </Button>
+              {/* Content Area */}
+              <div className="lg:w-3/4">
+                {activeTab === 'orders' && (
+                  <div className="animate-fade-in">
+                    <div className="section-header rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Package className="w-6 h-6 text-amber-400" />
+                        <h2 className="font-display text-2xl font-semibold">Order History</h2>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {orders.map((order) => {
-                        const status = statusConfig[order.status] || statusConfig.pending;
-                        const isExpanded = expandedOrders[order.id] || false;
-                        
-                        const toggleOrder = (orderId: string) => {
-                          setExpandedOrders(prev => ({
-                            ...prev,
-                            [orderId]: !prev[orderId]
-                          }));
-                        };
-                        
-                        return (
-                          <div
-                            key={order.id}
-                            className="bg-card rounded-lg border border-border/60 shadow-sm hover:shadow-md transition-shadow"
-                          >
-                            {/* Collapsed View */}
-                            <div className="p-4 md:p-6" onClick={() => toggleOrder(order.id)}>
-                              <div className="flex flex-col gap-3">
-                                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+
+                    {orders.length === 0 ? (
+                      <div 
+                        className="royal-card rounded-xl p-12 text-center empty-state"
+                      >
+                        <div className="float-animation">
+                          <Package className="w-20 h-20 text-amber-400/20 mx-auto mb-6" />
+                        </div>
+                        <h3 className="gold-text text-xl font-semibold mb-2">No Orders Yet</h3>
+                        <p className="text-gray-400 mb-6">
+                          Begin your royal shopping experience today!
+                        </p>
+                        <button 
+                          className="royal-btn px-6 py-3 rounded-lg inline-flex items-center gap-2"
+                          onClick={() => navigate('/products')}
+                        >
+                          <Crown className="w-5 h-5" /> Browse Collection
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {orders.map((order) => {
+                          const status = statusConfig[order.status] || statusConfig.pending;
+                          const isExpanded = expandedOrders[order.id] || false;
+                          
+                          const toggleOrder = (orderId: string) => {
+                            setExpandedOrders(prev => ({
+                              ...prev,
+                              [orderId]: !prev[orderId]
+                            }));
+                          };
+                          
+                          return (
+                            <div
+                              key={order.id}
+                              className="order-card rounded-xl cursor-pointer"
+                              onClick={() => toggleOrder(order.id)}
+                            >
+                              {/* Order Header */}
+                              <div className="p-6">
+                                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                                   <div className="min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <span className="font-display font-semibold text-primary">
+                                    <div className="flex flex-wrap items-center gap-3 mb-2">
+                                      <span className="gold-text font-semibold text-lg">
                                         {order.order_id}
                                       </span>
-                                      <span
-                                        className={cn(
-                                          "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border border-border bg-muted/40",
-                                          status.color
-                                        )}
-                                      >
+                                      <span className={`status-badge ${status.className}`}>
                                         {status.icon}
                                         {status.label}
                                       </span>
+                                      {order.return_status && (
+                                        <span className={cn(
+                                          "status-badge",
+                                          order.return_status === 'requested' ? 'status-confirmed' :
+                                          order.return_status === 'approved' ? 'status-delivered' :
+                                          order.return_status === 'rejected' ? 'status-cancelled' :
+                                          'status-processing'
+                                        )}>
+                                          Return: {order.return_status.charAt(0).toUpperCase() + order.return_status.slice(1)}
+                                        </span>
+                                      )}
                                     </div>
-                                    <p className="text-sm text-muted-foreground mt-1">
+                                    <p className="text-gray-400 text-sm">
                                       {new Date(order.created_at).toLocaleDateString('en-IN', {
                                         year: 'numeric',
                                         month: 'long',
@@ -787,21 +1170,19 @@ export default function CustomerProfile() {
                                     </p>
                                   </div>
 
-                                  <div className="flex flex-col md:items-end gap-2">
-                                    <div className="text-lg font-bold tabular-nums">
+                                  <div className="flex flex-col md:items-end gap-3">
+                                    <div className="order-amount">
                                       ₹{Number(order.total).toFixed(2)}
                                     </div>
 
                                     <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                      <Button
-                                        variant="royalOutline"
-                                        size="sm"
+                                      <button
+                                        className="royal-btn-outline px-3 py-1.5 rounded-lg text-xs"
                                         onClick={() => navigate(`/track-order?id=${order.order_id}`)}
                                       >
-                                        Track
-                                      </Button>
+                                        Track Order
+                                      </button>
 
-                                      {/* Return button for delivered orders */}
                                       {order.status === 'delivered' && !order.return_status && (
                                         <ReturnOrderButton 
                                           order={order} 
@@ -814,296 +1195,296 @@ export default function CustomerProfile() {
                                         />
                                       )}
 
-                                      {order.return_status && (
-                                        <span className={cn(
-                                          "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border",
-                                          order.return_status === 'requested' ? 'border-blue-200 bg-blue-50 text-blue-700' :
-                                          order.return_status === 'approved' ? 'border-green-200 bg-green-50 text-green-700' :
-                                          order.return_status === 'rejected' ? 'border-red-200 bg-red-50 text-red-700' :
-                                          order.return_status === 'refunded' ? 'border-green-200 bg-green-50 text-green-700' :
-                                          'border-gray-200 bg-gray-50 text-gray-700'
-                                        )}>
-                                          Return: {order.return_status.charAt(0).toUpperCase() + order.return_status.slice(1)}
-                                        </span>
-                                      )}
-
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="gap-1"
+                                      <button
+                                        className="text-amber-400/60 hover:text-amber-400 transition-colors p-2"
                                         onClick={() => toggleOrder(order.id)}
                                       >
-                                        {isExpanded ? 'Hide' : 'Details'}
                                         {isExpanded ? (
-                                          <ChevronUp className="w-4 h-4" />
+                                          <ChevronUp className="w-5 h-5" />
                                         ) : (
-                                          <ChevronDown className="w-4 h-4" />
+                                          <ChevronDown className="w-5 h-5" />
                                         )}
-                                      </Button>
+                                      </button>
                                     </div>
                                   </div>
                                 </div>
 
-                                {/* Order Summary - Always visible */}
-                                <div className="rounded-md border border-border/50 bg-muted/10">
-                                  <div className="px-4 py-2 border-b border-border/50 text-xs font-medium text-muted-foreground">
-                                    Items
+                                {/* Order Items Preview */}
+                                <div 
+                                  className="mt-4 rounded-lg p-4"
+                                  style={{ 
+                                    background: 'rgba(212, 175, 55, 0.05)',
+                                    border: '1px solid rgba(212, 175, 55, 0.1)'
+                                  }}
+                                >
+                                  <div className="text-xs text-amber-400/60 mb-3 uppercase tracking-wider font-semibold">
+                                    Order Items
                                   </div>
-                                  <div className="p-4 space-y-3">
+                                  <div className="space-y-3">
                                     {order.items && order.items.length > 0 ? (
                                       <>
                                         {order.items.slice(0, 2).map((item, idx) => (
                                           <div key={idx} className="flex items-center gap-3">
                                             {item.product_image && (
-                                              <img
-                                                src={item.product_image}
-                                                alt={item.product_name}
-                                                className="w-10 h-10 object-cover rounded-md border border-border/50"
-                                                onError={(e) => {
-                                                  const target = e.target as HTMLImageElement;
-                                                  target.style.display = 'none';
-                                                  const fallback = target.parentElement?.querySelector('.image-fallback');
-                                                  if (fallback) {
-                                                    (fallback as HTMLElement).style.display = 'block';
-                                                  }
-                                                }}
-                                              />
+                                              <div 
+                                                className="w-12 h-12 rounded-lg overflow-hidden border border-amber-400/20"
+                                                style={{ background: 'rgba(26, 26, 46, 0.8)' }}
+                                              >
+                                                <img
+                                                  src={item.product_image}
+                                                  alt={item.product_name}
+                                                  className="w-full h-full object-cover"
+                                                />
+                                              </div>
                                             )}
                                             <div className="min-w-0 flex-1">
-                                              <p className="font-medium text-sm truncate">{item.product_name}</p>
-                                              <p className="text-muted-foreground text-xs">Qty: {item.quantity}</p>
+                                              <p className="text-gray-200 font-medium truncate">{item.product_name}</p>
+                                              <p className="text-gray-400 text-xs">Qty: {item.quantity}</p>
                                             </div>
-                                            <div className="text-right text-sm tabular-nums">
+                                            <div className="text-amber-400/80 font-medium">
                                               ₹{Number(item.product_price).toFixed(2)}
                                             </div>
                                           </div>
                                         ))}
                                         {order.items.length > 2 && (
-                                          <p className="text-xs text-muted-foreground">
+                                          <p className="text-xs text-gray-400 pl-15">
                                             +{order.items.length - 2} more item{order.items.length - 2 === 1 ? '' : 's'}
                                           </p>
                                         )}
                                       </>
                                     ) : (
-                                      <p className="text-sm text-muted-foreground">No items found for this order.</p>
+                                      <p className="text-gray-400 text-sm">No items found for this order.</p>
                                     )}
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                            
-                            {/* Expanded View */}
-                            {isExpanded && (
-                              <div className="p-4 md:p-6 pt-0 md:pt-0 border-t border-border/50 mt-4 md:mt-0">
-                                {/* Order Details */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                                  {/* Delivery Address */}
-                                  <div className="border border-border/50 rounded-lg p-4">
-                                    <h4 className="font-semibold mb-2 text-sm text-muted-foreground">Delivery Address</h4>
-                                    <p className="font-medium">{order.customer_name}</p>
-                                    <p className="text-muted-foreground">{order.customer_phone}</p>
-                                    <p className="mt-1">{order.customer_address}</p>
-                                    {order.customer_address?.includes('Landmarks:') && (
-                                      <div className="mt-2">
-                                        <p className="text-sm text-muted-foreground">Landmarks:</p>
-                                        <ul className="list-disc list-inside text-sm text-muted-foreground">
-                                          {order.customer_address
-                                            .split('Landmarks:')[1]
-                                            ?.split('•')
-                                            .filter(item => item.trim())
-                                            .map((item, idx) => (
-                                              <li key={idx}>{item.trim()}</li>
-                                            ))}
-                                        </ul>
+                              
+                              {/* Expanded Details */}
+                              {isExpanded && (
+                                <div 
+                                  className="px-6 pb-6 pt-0 border-t border-amber-400/10"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                                    {/* Delivery Address */}
+                                    <div 
+                                      className="rounded-lg p-5"
+                                      style={{ 
+                                        background: 'rgba(212, 175, 55, 0.03)',
+                                        border: '1px solid rgba(212, 175, 55, 0.15)'
+                                      }}
+                                    >
+                                      <h4 className="text-amber-400/80 text-xs uppercase tracking-wider font-semibold mb-3 flex items-center gap-2">
+                                        <MapPin className="w-4 h-4" /> Delivery Address
+                                      </h4>
+                                      <p className="text-gray-200 font-medium">{order.customer_name}</p>
+                                      <p className="text-gray-400 text-sm mt-1">{order.customer_phone}</p>
+                                      <p className="text-gray-400 text-sm mt-2">{order.customer_address}</p>
+                                    </div>
+                                    
+                                    {/* Order Summary */}
+                                    <div 
+                                      className="rounded-lg p-5"
+                                      style={{ 
+                                        background: 'rgba(212, 175, 55, 0.03)',
+                                        border: '1px solid rgba(212, 175, 55, 0.15)'
+                                      }}
+                                    >
+                                      <h4 className="text-amber-400/80 text-xs uppercase tracking-wider font-semibold mb-3 flex items-center gap-2">
+                                        <Package className="w-4 h-4" /> Order Summary
+                                      </h4>
+                                      <div className="space-y-3">
+                                        {order.items && order.items.map((item, idx) => (
+                                          <div key={idx} className="flex items-center gap-3">
+                                            {item.product_image && (
+                                              <img 
+                                                src={item.product_image} 
+                                                alt={item.product_name}
+                                                className="w-10 h-10 object-cover rounded-md border border-amber-400/20"
+                                              />
+                                            )}
+                                            <div className="flex-1">
+                                              <p className="text-gray-200 text-sm font-medium">{item.product_name}</p>
+                                              <p className="text-gray-400 text-xs">Qty: {item.quantity}</p>
+                                            </div>
+                                            <div className="text-amber-400/80 text-sm">
+                                              ₹{Number(item.product_price).toFixed(2)}
+                                            </div>
+                                          </div>
+                                        ))}
                                       </div>
-                                    )}
+                                      <div 
+                                        className="mt-4 pt-4 border-t border-amber-400/10 flex justify-between items-center"
+                                      >
+                                        <span className="text-gray-300 font-medium">Total</span>
+                                        <span className="gold-text text-lg font-bold">₹{Number(order.total).toFixed(2)}</span>
+                                      </div>
+                                    </div>
                                   </div>
                                   
-                                  {/* Order Summary with Total */}
-                                  <div className="border border-border/50 rounded-lg p-4">
-                                    <h4 className="font-semibold mb-2 text-sm text-muted-foreground">Order Summary</h4>
-                                    <div className="space-y-3">
-                                      {order.items && order.items.length > 0 && order.items.map((item, idx) => (
-                                        <div key={idx} className="flex items-center gap-3">
-                                          {item.product_image && (
-                                            <img 
-                                              src={item.product_image} 
-                                              alt={item.product_name}
-                                              className="w-12 h-12 object-cover rounded-lg border border-border/50"
-                                              onError={(e) => {
-                                                const target = e.target as HTMLImageElement;
-                                                target.style.display = 'none';
-                                                const fallback = target.parentElement?.querySelector('.image-fallback');
-                                                if (fallback) {
-                                                  (fallback as HTMLElement).style.display = 'block';
-                                                }
-                                              }}
-                                            />
-                                          )}
-                                          <div className="flex-1">
-                                            <p className="font-medium">{item.product_name}</p>
-                                            <p className="text-muted-foreground text-sm">Qty: {item.quantity}</p>
+                                  {/* Messages from Store */}
+                                  {order.messages && order.messages.length > 0 && (
+                                    <div 
+                                      className="mt-6 pt-6 border-t border-amber-400/10"
+                                    >
+                                      <h4 className="text-amber-400/80 text-xs uppercase tracking-wider font-semibold mb-4 flex items-center gap-2">
+                                        <Star className="w-4 h-4" /> Messages from Store
+                                      </h4>
+                                      <div className="space-y-3">
+                                        {order.messages.map((message, idx) => (
+                                          <div 
+                                            key={idx} 
+                                            className="rounded-lg p-4"
+                                            style={{ 
+                                              background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.1) 0%, rgba(212, 175, 55, 0.05) 100%)',
+                                              border: '1px solid rgba(212, 175, 55, 0.2)'
+                                            }}
+                                          >
+                                            <p className="text-gray-200">{message.message}</p>
+                                            <p className="text-amber-400/50 text-xs mt-2">
+                                              {new Date(message.created_at).toLocaleString('en-IN', {
+                                                month: 'short',
+                                                day: 'numeric',
+                                                year: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                              })}
+                                            </p>
                                           </div>
-                                          <div className="text-right">
-                                            <p>₹{Number(item.product_price).toFixed(2)}</p>
-                                            <p className="text-muted-foreground text-sm">₹{Number(item.product_price).toFixed(2)} each</p>
-                                          </div>
-                                        </div>
-                                      ))}
+                                        ))}
+                                      </div>
                                     </div>
-                                    <div className="border-t border-border/50 mt-3 pt-3 font-semibold">
-                                      Total: ₹{Number(order.total).toFixed(2)}
-                                    </div>
-                                  </div>
+                                  )}
                                 </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === 'returns' && (
+                  <div className="animate-fade-in">
+                    <div className="section-header rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Shield className="w-6 h-6 text-amber-400" />
+                        <h2 className="font-display text-2xl font-semibold">Return History</h2>
+                      </div>
+                    </div>
+
+                    {returns.length === 0 ? (
+                      <div 
+                        className="royal-card rounded-xl p-12 text-center empty-state"
+                      >
+                        <div className="float-animation">
+                          <Shield className="w-20 h-20 text-amber-400/20 mx-auto mb-6" />
+                        </div>
+                        <h3 className="gold-text text-xl font-semibold mb-2">No Returns Yet</h3>
+                        <p className="text-gray-400">
+                          You haven't initiated any returns yet. We hope you love all your purchases!
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {returns.map((ret) => (
+                          <div
+                            key={ret.id}
+                            className="order-card rounded-xl p-6"
+                          >
+                            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-3 mb-2">
+                                  <span className="gold-text font-semibold">
+                                    Return for Order: {ret.order_id}
+                                  </span>
+                                  <span className={cn(
+                                    "status-badge",
+                                    ret.return_status === 'requested' ? 'status-confirmed' :
+                                    ret.return_status === 'approved' ? 'status-delivered' :
+                                    ret.return_status === 'rejected' ? 'status-cancelled' :
+                                    ret.return_status === 'refunded' ? 'status-delivered' :
+                                    'status-pending'
+                                  )}>
+                                    {ret.return_status.charAt(0).toUpperCase() + ret.return_status.slice(1)}
+                                  </span>
+                                </div>
+                                <p className="text-gray-400 text-sm">
+                                  {new Date(ret.requested_at).toLocaleDateString('en-IN', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                  })}
+                                </p>
+                                <p className="text-gray-300 mt-3">
+                                  <span className="text-amber-400/60">Reason:</span> {ret.return_reason}
+                                </p>
+                                {ret.refund_amount && (
+                                  <p className="text-gray-300 mt-1">
+                                    <span className="text-amber-400/60">Refund Amount:</span>{' '}
+                                    <span className="gold-text font-medium">₹{Number(ret.refund_amount).toFixed(2)}</span>
+                                  </p>
+                                )}
                                 
-                                {/* Messages from Store */}
-                                {order.messages && order.messages.length > 0 && (
-                                  <div className="border-t border-border/50 pt-4">
-                                    <h4 className="font-semibold mb-2 text-sm text-muted-foreground">Messages from Store</h4>
-                                    <div className="space-y-2">
-                                      {order.messages.map((message, idx) => (
-                                        <div key={idx} className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                                          <p className="text-sm text-black">{message.message}</p>
-                                          <p className="text-xs text-black mt-1">
-                                            {new Date(message.created_at).toLocaleString('en-IN', {
-                                              month: 'short',
-                                              day: 'numeric',
-                                              year: 'numeric',
-                                              hour: '2-digit',
-                                              minute: '2-digit'
-                                            })}
-                                          </p>
-                                        </div>
+                                {/* Return Images */}
+                                {ret.images && ret.images.length > 0 && (
+                                  <div className="mt-4">
+                                    <p className="text-amber-400/60 text-sm mb-2">Return Images:</p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {ret.images.slice(0, 4).map((image: string, idx: number) => (
+                                        <a 
+                                          key={idx}
+                                          href={image}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="block"
+                                        >
+                                          <img 
+                                            src={image}
+                                            alt={`Return image ${idx + 1}`}
+                                            className="w-16 h-16 object-cover rounded-lg border border-amber-400/20 hover:border-amber-400/50 transition-colors"
+                                          />
+                                        </a>
                                       ))}
+                                      {ret.images.length > 4 && (
+                                        <div 
+                                          className="flex items-center justify-center w-16 h-16 rounded-lg text-xs text-amber-400/60"
+                                          style={{ 
+                                            background: 'rgba(212, 175, 55, 0.1)',
+                                            border: '1px solid rgba(212, 175, 55, 0.2)'
+                                          }}
+                                        >
+                                          +{ret.images.length - 4}
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 )}
                               </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {activeTab === 'returns' && (
-                <div className="animate-fade-in">
-                  <div className="flex items-center gap-2 mb-6">
-                    <Package className="w-6 h-6 text-primary" />
-                    <h2 className="font-display text-2xl font-semibold">Return History</h2>
-                  </div>
-
-                  {returns.length === 0 ? (
-                    <div className="bg-card rounded-xl border border-border/50 p-12 text-center">
-                      <Package className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-                      <h3 className="font-display text-lg font-semibold mb-2">No Returns Yet</h3>
-                      <p className="text-muted-foreground mb-4">
-                        You haven't initiated any returns yet.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {returns.map((ret) => (
-                        <div
-                          key={ret.id}
-                          className="bg-card rounded-lg border border-border/60 shadow-sm p-4 md:p-6"
-                        >
-                          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-display font-semibold text-primary">
-                                  Return for Order: {ret.order_id}
-                                </span>
-                                <span
-                                  className={cn(
-                                    "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border",
-                                    ret.return_status === 'requested' ? 'border-blue-200 bg-blue-50 text-blue-700' :
-                                    ret.return_status === 'approved' ? 'border-green-200 bg-green-50 text-green-700' :
-                                    ret.return_status === 'rejected' ? 'border-red-200 bg-red-50 text-red-700' :
-                                    ret.return_status === 'refunded' ? 'border-green-200 bg-green-50 text-green-700' :
-                                    'border-gray-200 bg-gray-50 text-gray-700'
-                                  )}
-                                >
-                                  {ret.return_status.charAt(0).toUpperCase() + ret.return_status.slice(1)}
-                                </span>
-                              </div>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {new Date(ret.requested_at).toLocaleDateString('en-IN', {
-                                  year: 'numeric',
-                                  month: 'long',
-                                  day: 'numeric',
-                                })}
-                              </p>
-                              <p className="text-sm mt-2">
-                                <span className="font-medium">Reason:</span> {ret.return_reason}
-                              </p>
-                              {ret.refund_amount && (
-                                <p className="text-sm">
-                                  <span className="font-medium">Refund Amount:</span> ₹{Number(ret.refund_amount).toFixed(2)}
-                                </p>
-                              )}
-                              {ret.images && ret.images.length > 0 && (
-                                <div className="mt-3">
-                                  <p className="text-sm font-medium mb-1">Return Images:</p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {ret.images.slice(0, 4).map((image, idx) => (
-                                      <a 
-                                        key={idx}
-                                        href={image}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="block"
-                                      >
-                                        <img 
-                                          src={image}
-                                          alt={`Return image ${idx + 1}`}
-                                          className="w-16 h-16 object-cover rounded border"
-                                          onError={(e) => {
-                                            const target = e.target as HTMLImageElement;
-                                            target.style.display = 'none';
-                                            const fallback = target.parentElement?.querySelector('.image-fallback');
-                                            if (fallback) {
-                                              (fallback as HTMLElement).style.display = 'block';
-                                            }
-                                          }}
-                                        />
-                                        <div className="image-fallback hidden absolute inset-0 bg-gray-200 flex items-center justify-center rounded">
-                                          <span className="text-xs text-gray-500">Img {idx + 1}</span>
-                                        </div>
-                                      </a>
-                                    ))}
-                                    {ret.images.length > 4 && (
-                                      <div className="flex items-center justify-center w-16 h-16 bg-gray-100 rounded border text-xs text-gray-500">
-                                        +{ret.images.length - 4}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
-              {activeTab === 'chatbot' && (
-                <div className="animate-fade-in">
-                  <div className="flex items-center gap-2 mb-6">
-                    <span className="text-2xl text-primary">💬</span>
-                    <h2 className="font-display text-2xl font-semibold">AI Assistant Chatbot</h2>
+                {activeTab === 'chatbot' && (
+                  <div className="animate-fade-in">
+                    <div className="section-header rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Sparkles className="w-6 h-6 text-amber-400" />
+                        <h2 className="font-display text-2xl font-semibold">AI Assistant</h2>
+                      </div>
+                    </div>
+                    
+                    <div className="royal-card rounded-xl p-6">
+                      <ChatbotComponent />
+                    </div>
                   </div>
-                  
-                  <div className="bg-card rounded-xl border border-border/50 p-6">
-                    <ChatbotComponent />
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1112,10 +1493,10 @@ export default function CustomerProfile() {
   );
 }
 
-// Chatbot Component
+// Chatbot Component with Royal Theme
 const ChatbotComponent = () => {
   const [messages, setMessages] = useState<Array<{id: string; text: string; sender: 'user' | 'bot'; timestamp: Date; imageUrl?: string}>>([
-    { id: '1', text: 'Hello! I\'m your friendly AI assistant. How can I help you today?', sender: 'bot', timestamp: new Date() }
+    { id: '1', text: 'Greetings, esteemed customer! I\'m your royal AI assistant. How may I serve you today?', sender: 'bot', timestamp: new Date() }
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -1135,12 +1516,10 @@ const ChatbotComponent = () => {
 
     let messageToSend = inputMessage;
     
-    // If there's an uploaded image, include it in the message
     if (uploadedImage) {
       messageToSend = messageToSend + (messageToSend ? ' ' : '') + '[Attached image]';
     }
 
-    // Add user message
     const userMessage = {
       id: Date.now().toString(),
       text: messageToSend,
@@ -1155,9 +1534,8 @@ const ChatbotComponent = () => {
     setIsLoading(true);
 
     try {
-      // Prepare messages for API
       const apiMessages = [
-        { role: 'system', content: 'You are a friendly AI assistant that can chat with customers, tell jokes, and provide helpful information. Be cheerful and engaging.', imageUrl: undefined },
+        { role: 'system', content: 'You are a royal AI assistant that serves premium customers with elegance. Be courteous, helpful, and add a touch of sophistication to your responses.', imageUrl: undefined },
         ...messages.map(msg => ({
           role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
           content: msg.text,
@@ -1166,16 +1544,13 @@ const ChatbotComponent = () => {
         { role: 'user', content: messageToSend, imageUrl: uploadedImage || undefined }
       ];
 
-      // Dynamically import and instantiate the service
       const { default: GeminiService } = await import('@/lib/sambanova');
       const serviceInstance = new GeminiService();
       
-      // Call Gemini API
       const response = await serviceInstance.generateContent(apiMessages);
       
-      const botResponse = response.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't process that. Could you try again?";
+      const botResponse = response.candidates?.[0]?.content?.parts?.[0]?.text || "My apologies, I couldn't process that. Could you kindly try again?";
       
-      // Add bot response
       const botMessage = {
         id: (Date.now() + 1).toString(),
         text: botResponse,
@@ -1188,7 +1563,7 @@ const ChatbotComponent = () => {
       console.error('Error with chatbot:', error);
       const errorMessage = {
         id: (Date.now() + 1).toString(),
-        text: "Sorry, I'm having trouble connecting to the AI service right now. Please try again later.",
+        text: "My apologies, I'm experiencing some difficulties at the moment. Please try again later.",
         sender: 'bot' as const,
         timestamp: new Date()
       };
@@ -1211,7 +1586,7 @@ const ChatbotComponent = () => {
 
   const clearChat = () => {
     setMessages([
-      { id: '1', text: 'Hello! I\'m your friendly AI assistant. How can I help you today?', sender: 'bot', timestamp: new Date() }
+      { id: '1', text: 'Greetings, esteemed customer! I\'m your royal AI assistant. How may I serve you today?', sender: 'bot', timestamp: new Date() }
     ]);
     setUploadedImage(null);
   };
@@ -1221,7 +1596,7 @@ const ChatbotComponent = () => {
     
     const jokeMessage = {
       id: Date.now().toString(),
-      text: "Tell me a joke",
+      text: "Tell me a royal joke",
       sender: 'user' as const,
       timestamp: new Date()
     };
@@ -1231,22 +1606,21 @@ const ChatbotComponent = () => {
 
     try {
       const apiMessages = [
-        { role: 'system', content: 'You are a friendly AI assistant that loves to tell jokes. When asked, provide a funny joke.', imageUrl: undefined },
+        { role: 'system', content: 'You are a royal AI assistant with a refined sense of humor. Share an elegant, witty joke.', imageUrl: undefined },
         ...messages.map(msg => ({
           role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
           content: msg.text,
           imageUrl: msg.imageUrl
         })),
-        { role: 'user', content: 'Tell me a joke', imageUrl: undefined }
+        { role: 'user', content: 'Tell me a royal joke', imageUrl: undefined }
       ];
 
-      // Dynamically import and instantiate the service
       const { default: GeminiService } = await import('@/lib/sambanova');
       const serviceInstance = new GeminiService();
       
       const response = await serviceInstance.generateContent(apiMessages);
       
-      const jokeResponse = response.candidates?.[0]?.content?.parts?.[0]?.text || "Here's a joke: Why don't scientists trust atoms? Because they make up everything!";
+      const jokeResponse = response.candidates?.[0]?.content?.parts?.[0]?.text || "Why did the king go to the dentist? To get his teeth crowned! 👑";
       
       const botMessage = {
         id: (Date.now() + 1).toString(),
@@ -1260,7 +1634,7 @@ const ChatbotComponent = () => {
       console.error('Error with chatbot joke:', error);
       const errorMessage = {
         id: (Date.now() + 1).toString(),
-        text: "Sorry, I'm having trouble connecting to the AI service right now. Please try again later.",
+        text: "My apologies, I'm having trouble connecting at the moment. Here's a classic: Why did the king go to the dentist? To get his teeth crowned! 👑",
         sender: 'bot' as const,
         timestamp: new Date()
       };
@@ -1271,75 +1645,82 @@ const ChatbotComponent = () => {
   };
 
   return (
-    <div className="flex flex-col h-[500px] max-w-4xl mx-auto">
-      {/* Chat header */}
-      <div className="flex justify-between items-center mb-4 pb-2 border-b border-border">
+    <div className="flex flex-col h-[500px] min-h-[400px]">
+      {/* Chat Header */}
+      <div 
+        className="flex justify-between items-center mb-4 pb-4"
+        style={{ borderBottom: '1px solid rgba(212, 175, 55, 0.2)' }}
+      >
         <div>
-          <h3 className="font-semibold text-lg">AI Assistant</h3>
-          <p className="text-xs text-muted-foreground mt-1">Note: Images are for context only. The AI analyzes text-based messages.</p>
+          <h3 className="gold-text text-lg font-semibold flex items-center gap-2">
+            <Crown className="w-5 h-5 text-amber-400" /> Royal AI Assistant
+          </h3>
+          <p className="text-gray-400 text-xs mt-1">Your personal concierge at your service</p>
         </div>
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <button 
+            className="royal-btn-outline px-3 py-1.5 rounded-lg text-xs flex items-center gap-1"
             onClick={tellJoke}
             disabled={isLoading}
-            className="flex items-center gap-1"
           >
-            <span>😄</span> Tell Joke
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
+            <span>👑</span> Royal Joke
+          </button>
+          <button 
+            className="royal-btn-outline px-3 py-1.5 rounded-lg text-xs flex items-center gap-1"
             onClick={clearChat}
             disabled={isLoading}
-            className="flex items-center gap-1"
           >
-            <span>🗑️</span> Clear Chat
-          </Button>
+            <span>🗑️</span> Clear
+          </button>
         </div>
       </div>
       
-      {/* Messages container */}
-      <div className="flex-1 overflow-y-auto mb-4 space-y-4 pr-2">
+      {/* Messages Container */}
+      <div className="flex-1 overflow-y-auto mb-4 space-y-4 pr-2 royal-scrollbar">
         {messages.map((message) => (
           <div 
             key={message.id} 
             className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div 
-              className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+              className={cn(
+                "max-w-[80%] rounded-2xl px-4 py-3",
                 message.sender === 'user' 
-                  ? 'bg-primary text-primary-foreground rounded-br-none' 
-                  : 'bg-muted text-foreground rounded-bl-none'
-              }`}
+                  ? 'chat-message-user rounded-br-sm' 
+                  : 'chat-message-bot rounded-bl-sm text-white'
+              )}
             >
-              <div className="whitespace-pre-wrap break-words">{message.text}</div>
+              <div className="whitespace-pre-wrap break-words">
+                {message.text}
+              </div>
               
-              {/* Show image if message contains image reference */}
               {message.imageUrl && (
                 <div className="mt-2 flex justify-center">
                   <img 
                     src={message.imageUrl} 
                     alt="Uploaded for chat" 
-                    className="max-h-32 max-w-xs object-contain rounded border border-border" 
+                    className="max-h-32 max-w-xs object-contain rounded border border-amber-400/20" 
                   />
                 </div>
               )}
               
-              <div className={`text-xs mt-1 ${message.sender === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+              <div className={cn(
+                "text-xs mt-2",
+                message.sender === 'user' ? 'text-amber-900/60' : 'text-gray-400'
+              )}>
                 {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>
             </div>
           </div>
         ))}
+        
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-muted text-foreground rounded-2xl rounded-bl-none px-4 py-2 max-w-[80%]">
+            <div className="chat-message-bot rounded-2xl rounded-bl-sm px-4 py-3 max-w-[80%]">
               <div className="flex items-center gap-2">
-                <div className="h-2 w-2 bg-foreground rounded-full animate-bounce"></div>
-                <div className="h-2 w-2 bg-foreground rounded-full animate-bounce delay-75"></div>
-                <div className="h-2 w-2 bg-foreground rounded-full animate-bounce delay-150"></div>
+                <div className="h-2 w-2 bg-amber-400 rounded-full animate-bounce"></div>
+                <div className="h-2 w-2 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="h-2 w-2 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
             </div>
           </div>
@@ -1347,20 +1728,20 @@ const ChatbotComponent = () => {
         <div ref={messagesEndRef} />
       </div>
       
-      {/* Image preview */}
+      {/* Image Preview */}
       {uploadedImage && (
-        <div className="mb-3 flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Attached image:</span>
+        <div className="mb-3 flex items-center gap-3">
+          <span className="text-gray-400 text-sm">Attached:</span>
           <div className="relative">
             <img 
               src={uploadedImage} 
               alt="Preview" 
-              className="w-16 h-16 object-cover rounded border border-border" 
+              className="w-16 h-16 object-cover rounded-lg border border-amber-400/30" 
             />
             <button 
               type="button" 
               onClick={() => setUploadedImage(null)}
-              className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs"
+              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
             >
               ×
             </button>
@@ -1368,29 +1749,27 @@ const ChatbotComponent = () => {
         </div>
       )}
       
-      {/* Input area */}
-      <div className="flex gap-2">
-        <div className="flex-1 flex gap-2">
-          <Input
+      {/* Input Area */}
+      <div className="flex gap-2 flex-wrap">
+        <div className="flex-1 flex gap-2 flex-wrap">
+          <input
             type="text"
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             placeholder="Type your message..."
             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
             disabled={isLoading}
-            className="flex-1"
+            className="royal-input flex-1 px-4 py-3 rounded-lg min-w-[150px]"
           />
-          <Button 
-            variant="outline" 
-            size="icon"
+          <button 
             type="button"
             disabled={isLoading}
-            className="h-10 w-10"
+            className="royal-btn-outline h-12 w-12 rounded-lg flex items-center justify-center"
             onClick={() => document.getElementById('chatbot-image-upload')?.click()}
           >
-            <span>🖼️</span>
-          </Button>
-          <Input
+            <Camera className="w-5 h-5" />
+          </button>
+          <input
             id="chatbot-image-upload"
             type="file"
             accept="image/*"
@@ -1399,20 +1778,23 @@ const ChatbotComponent = () => {
             disabled={isLoading}
           />
         </div>
-        <Button 
+        <button 
           onClick={handleSendMessage} 
           disabled={!inputMessage.trim() && !uploadedImage || isLoading}
-          className="min-w-[80px]"
+          className="royal-btn px-4 py-3 rounded-lg min-w-[80px] flex items-center justify-center gap-2 flex-shrink-0"
         >
           {isLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : 'Send'}
-        </Button>
+            <div className="w-5 h-5 royal-spinner"></div>
+          ) : (
+            <>Send</>
+          )}
+        </button>
       </div>
     </div>
   );
 };
 
+// Return Order Button Component with Royal Theme
 const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, profile: CustomerProfile | null, onReturnRequest: () => void }) => {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -1442,7 +1824,6 @@ const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, 
     
     setImages(newImages);
     
-    // Create previews for the new images
     const newPreviews = files.map(file => URL.createObjectURL(file));
     setImagePreviews(prev => [...prev, ...newPreviews]);
   };
@@ -1467,13 +1848,11 @@ const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, 
       return;
     }
     
-    // Validate image count
     if (images.length < 2 || images.length > 6) {
       setImageError('Please upload between 2 and 6 images');
       return;
     }
 
-    // Check if order is older than 7 days
     const orderDate = new Date(order.created_at);
     const currentDate = new Date();
     const diffTime = Math.abs(currentDate.getTime() - orderDate.getTime());
@@ -1486,7 +1865,6 @@ const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, 
     
     setLoading(true);
     try {
-      // Upload images to storage
       const imageUrls: string[] = [];
       
       for (let i = 0; i < images.length; i++) {
@@ -1508,7 +1886,6 @@ const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, 
         }
       }
       
-      // Determine the actual return reason - if 'Other', use the custom reason
       const actualReason = reason === 'Other' ? otherReason : reason;
       
       const { error } = await supabase
@@ -1525,7 +1902,6 @@ const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, 
 
       if (error) throw error;
 
-      // Update the order's return status
       await supabase
         .from('orders')
         .update({
@@ -1538,7 +1914,7 @@ const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, 
       toast.success('Return request submitted successfully!');
       setOpen(false);
       setReason("");
-      onReturnRequest(); // Refresh orders
+      onReturnRequest();
     } catch (error: any) {
       console.error('Error requesting return:', error);
       toast.error('Failed to submit return request');
@@ -1551,31 +1927,39 @@ const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, 
     <>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" size="sm">
+          <button className="royal-btn-outline px-3 py-1.5 rounded-lg text-xs">
             Request Return
-          </Button>
+          </button>
         </DialogTrigger>
-        <DialogContent>
+        <DialogContent className="royal-dialog border-amber-400/30 max-w-lg">
           <DialogHeader>
-            <DialogTitle>Request Return</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="gold-text text-xl flex items-center gap-2">
+              <Shield className="w-5 h-5 text-amber-400" /> Request Return
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
               Submit a return request for order {order.order_id}
             </DialogDescription>
           </DialogHeader>
           
           {showProfileAlert && (
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-              <p className="text-sm text-yellow-700">
-                Please fill your profile details (name, phone, address) before requesting a return.
+            <div 
+              className="mb-4 p-4 rounded-lg"
+              style={{ 
+                background: 'rgba(255, 193, 7, 0.1)', 
+                border: '1px solid rgba(255, 193, 7, 0.3)' 
+              }}
+            >
+              <p className="text-amber-400 text-sm">
+                Please complete your profile details (name, phone, address) before requesting a return.
               </p>
             </div>
           )}
 
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div>
-              <Label htmlFor="return-reason">Return Reason</Label>
+              <Label className="text-amber-400/80 text-sm mb-2 block">Return Reason</Label>
               <Select value={reason} onValueChange={setReason}>
-                <SelectTrigger>
+                <SelectTrigger className="royal-input">
                   <SelectValue placeholder="Select a reason" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1591,20 +1975,27 @@ const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, 
             
             {reason === 'Other' && (
               <div>
-                <Label htmlFor="custom-reason">Please specify</Label>
-                <Textarea
-                  id="custom-reason"
+                <Label className="text-amber-400/80 text-sm mb-2 block">Please specify</Label>
+                <textarea
                   placeholder="Enter your reason here..."
                   value={otherReason}
                   onChange={(e) => setOtherReason(e.target.value)}
+                  className="royal-input w-full px-4 py-3 rounded-lg resize-none"
+                  rows={3}
                 />
               </div>
             )}
             
             {/* Image Upload Section */}
             <div>
-              <Label>Upload Images (minimum 2, maximum 6)</Label>
-              <div className="border-2 border-dashed border-border rounded-lg p-6 text-center transition-colors hover:border-primary/50">
+              <Label className="text-amber-400/80 text-sm mb-2 block">
+                Upload Images (minimum 2, maximum 6)
+              </Label>
+              <div 
+                className="border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer hover:border-amber-400/50"
+                style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }}
+                onClick={() => document.getElementById(`return-image-upload-${order.id}`)?.click()}
+              >
                 <input
                   type="file"
                   multiple
@@ -1613,42 +2004,33 @@ const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, 
                   className="hidden"
                   id={`return-image-upload-${order.id}`}
                 />
-                <label 
-                  htmlFor={`return-image-upload-${order.id}`} 
-                  className="cursor-pointer inline-block"
-                >
-                  <div className="flex flex-col items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-muted-foreground mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                    <p className="text-sm text-muted-foreground">
-                      Click to upload images or drag and drop
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      PNG, JPG, GIF up to 5MB
-                    </p>
-                  </div>
-                </label>
+                <Camera className="w-10 h-10 text-amber-400/40 mx-auto mb-2" />
+                <p className="text-gray-400 text-sm">
+                  Click to upload images or drag and drop
+                </p>
+                <p className="text-gray-500 text-xs mt-1">
+                  PNG, JPG, GIF up to 5MB
+                </p>
               </div>
               
               {imageError && (
-                <p className="text-sm text-destructive mt-1">{imageError}</p>
+                <p className="text-red-400 text-sm mt-2">{imageError}</p>
               )}
               
               {/* Preview images */}
               {imagePreviews.length > 0 && (
-                <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="mt-4 grid grid-cols-3 gap-2">
                   {imagePreviews.map((preview, index) => (
                     <div key={index} className="relative group">
                       <img 
                         src={preview} 
                         alt={`Preview ${index + 1}`} 
-                        className="w-full h-20 object-cover rounded-md border"
+                        className="w-full h-20 object-cover rounded-lg border border-amber-400/20"
                       />
                       <button
                         type="button"
                         onClick={() => removeImage(index)}
-                        className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         ×
                       </button>
@@ -1657,20 +2039,27 @@ const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, 
                 </div>
               )}
               
-              <p className="text-xs text-muted-foreground mt-2">
+              <p className="text-gray-500 text-xs mt-2">
                 {images.length}/6 images uploaded
               </p>
             </div>
           </div>
           
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
+          <DialogFooter className="gap-3 mt-6">
+            <button 
+              className="royal-btn-outline px-4 py-2 rounded-lg"
+              onClick={() => setOpen(false)}
+            >
               Cancel
-            </Button>
-            <Button onClick={handleRequestReturn} disabled={loading}>
-              {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+            </button>
+            <button 
+              className="royal-btn px-4 py-2 rounded-lg flex items-center gap-2"
+              onClick={handleRequestReturn} 
+              disabled={loading}
+            >
+              {loading ? <div className="w-4 h-4 royal-spinner"></div> : null}
               Submit Return
-            </Button>
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
