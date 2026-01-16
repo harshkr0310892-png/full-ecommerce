@@ -98,16 +98,29 @@ export const PhotoViewerModal = ({ photoUrls, initialIndex = 0, onClose }: Photo
             </button>
           )}
 
-          <img
-            ref={imgRef}
-            src={currentPhotoUrl}
-            alt={`Contact submission photo ${currentIndex + 1}`}
-            className="max-w-full max-h-[70vh] object-contain"
-            style={{
-              transform: `scale(${scale}) rotate(${rotation}deg)`,
-              transition: "transform 0.2s ease"
-            }}
-          />
+          {currentPhotoUrl ? (
+            <img
+              ref={imgRef}
+              src={currentPhotoUrl}
+              alt={`Contact submission photo ${currentIndex + 1}`}
+              className="max-w-full max-h-[70vh] object-contain"
+              style={{
+                transform: `scale(${scale}) rotate(${rotation}deg)`,
+                transition: "transform 0.2s ease"
+              }}
+              crossOrigin="anonymous"
+              onError={(e) => {
+                console.error('Error loading image:', currentPhotoUrl, e);
+                // Set a fallback image if the image fails to load
+                (e.target as HTMLImageElement).src = 'https://placehold.co/800x600?text=Image+Not+Available';
+              }}
+              onLoad={() => console.log('Image loaded successfully:', currentPhotoUrl)}
+            />
+          ) : (
+            <div className="flex items-center justify-center w-full h-full">
+              <p className="text-white text-lg">No image available</p>
+            </div>
+          )}
 
           {/* Right arrow */}
           {photoUrls.length > 1 && (

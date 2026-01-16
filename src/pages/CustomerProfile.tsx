@@ -12,6 +12,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -21,6 +22,7 @@ import {
   Edit2, Save, X, ChevronDown, ChevronUp, Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface CustomerProfile {
   id: string;
@@ -40,6 +42,11 @@ interface Order {
   customer_name: string;
   customer_phone: string;
   customer_address: string;
+  return_status?: string | null;
+  return_reason?: string | null;
+  return_request_date?: string | null;
+  return_processed_date?: string | null;
+  return_refund_amount?: number | null;
   items?: { product_name: string; quantity: number; product_price: number; product_image?: string }[];
   messages?: {
     id: string;
@@ -71,6 +78,7 @@ export default function CustomerProfile() {
   const [userEmail, setUserEmail] = useState('');
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [returns, setReturns] = useState<any[]>([]); // Type should match your returns table
   const [editForm, setEditForm] = useState({
     full_name: '',
     phone: '',
@@ -93,6 +101,7 @@ export default function CustomerProfile() {
     await Promise.all([
       loadProfile(session.user.id),
       loadOrders(session.user.id, session.user.email || ''),
+      loadReturns(session.user.id),
     ]);
     setLoading(false);
   };
@@ -202,6 +211,40 @@ export default function CustomerProfile() {
     );
 
     setOrders(ordersWithDetails);
+  };
+
+  const loadReturns = async (userId: string) => {
+    try {
+      // First get the order IDs for this user
+      const { data: userOrders, error: ordersError } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('user_id', userId);
+
+      if (ordersError) throw ordersError;
+
+      const orderIds = userOrders.map(order => order.id);
+      
+      if (orderIds.length === 0) {
+        setReturns([]);
+        return;
+      }
+      
+      // Load returns for these orders
+      const { data: returnsData, error } = await supabase
+        .from('returns')
+        .select('*')
+        .in('order_id', orderIds)
+        .order('requested_at', { ascending: false });
+
+      if (error) throw error;
+
+      setReturns(returnsData || []);
+    } catch (error) {
+      console.error('Error loading returns:', error);
+      // Still initialize with empty array even if there's an error
+      setReturns([]);
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -724,6 +767,32 @@ export default function CustomerProfile() {
                                   Track
                                 </Button>
 
+                                {/* Return button for delivered orders */}
+                                {order.status === 'delivered' && !order.return_status && (
+                                  <ReturnOrderButton 
+                                    order={order} 
+                                    profile={profile} 
+                                    onReturnRequest={() => {
+                                      const userId = profile?.user_id || '';
+                                      loadOrders(userId, userEmail);
+                                      loadReturns(userId);
+                                    }} 
+                                  />
+                                )}
+
+                                {order.return_status && (
+                                  <span className={cn(
+                                    "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border",
+                                    order.return_status === 'requested' ? 'border-blue-200 bg-blue-50 text-blue-700' :
+                                    order.return_status === 'approved' ? 'border-green-200 bg-green-50 text-green-700' :
+                                    order.return_status === 'rejected' ? 'border-red-200 bg-red-50 text-red-700' :
+                                    order.return_status === 'refunded' ? 'border-green-200 bg-green-50 text-green-700' :
+                                    'border-gray-200 bg-gray-50 text-gray-700'
+                                  )}>
+                                    Return: {order.return_status.charAt(0).toUpperCase() + order.return_status.slice(1)}
+                                  </span>
+                                )}
+
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -884,8 +953,375 @@ export default function CustomerProfile() {
               </div>
             )}
           </div>
+
+          {/* Return History */}
+          <div className="animate-fade-in stagger-2 mt-12">
+            <h2 className="font-display text-xl font-semibold mb-4 flex items-center gap-2">
+              <Package className="w-5 h-5 text-primary" />
+              Return History
+            </h2>
+
+            {returns.length === 0 ? (
+              <div className="bg-card rounded-xl border border-border/50 p-12 text-center">
+                <Package className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+                <h3 className="font-display text-lg font-semibold mb-2">No Returns Yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  You haven't initiated any returns yet.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {returns.map((ret) => (
+                  <div
+                    key={ret.id}
+                    className="bg-card rounded-lg border border-border/60 shadow-sm p-4 md:p-6"
+                  >
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-display font-semibold text-primary">
+                            Return for Order: {ret.order_id}
+                          </span>
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border",
+                              ret.return_status === 'requested' ? 'border-blue-200 bg-blue-50 text-blue-700' :
+                              ret.return_status === 'approved' ? 'border-green-200 bg-green-50 text-green-700' :
+                              ret.return_status === 'rejected' ? 'border-red-200 bg-red-50 text-red-700' :
+                              ret.return_status === 'refunded' ? 'border-green-200 bg-green-50 text-green-700' :
+                              'border-gray-200 bg-gray-50 text-gray-700'
+                            )}
+                          >
+                            {ret.return_status.charAt(0).toUpperCase() + ret.return_status.slice(1)}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {new Date(ret.requested_at).toLocaleDateString('en-IN', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })}
+                        </p>
+                        <p className="text-sm mt-2">
+                          <span className="font-medium">Reason:</span> {ret.return_reason}
+                        </p>
+                        {ret.refund_amount && (
+                          <p className="text-sm">
+                            <span className="font-medium">Refund Amount:</span> ₹{Number(ret.refund_amount).toFixed(2)}
+                          </p>
+                        )}
+                        {ret.images && ret.images.length > 0 && (
+                          <div className="mt-3">
+                            <p className="text-sm font-medium mb-1">Return Images:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {ret.images.slice(0, 4).map((image, idx) => (
+                                <a 
+                                  key={idx}
+                                  href={image}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block"
+                                >
+                                  <img 
+                                    src={image}
+                                    alt={`Return image ${idx + 1}`}
+                                    className="w-16 h-16 object-cover rounded border"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.style.display = 'none';
+                                      const fallback = target.parentElement?.querySelector('.image-fallback');
+                                      if (fallback) {
+                                        (fallback as HTMLElement).style.display = 'block';
+                                      }
+                                    }}
+                                  />
+                                  <div className="image-fallback hidden absolute inset-0 bg-gray-200 flex items-center justify-center rounded">
+                                    <span className="text-xs text-gray-500">Img {idx + 1}</span>
+                                  </div>
+                                </a>
+                              ))}
+                              {ret.images.length > 4 && (
+                                <div className="flex items-center justify-center w-16 h-16 bg-gray-100 rounded border text-xs text-gray-500">
+                                  +{ret.images.length - 4}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </Layout>
   );
 }
+
+const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, profile: CustomerProfile | null, onReturnRequest: () => void }) => {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [otherReason, setOtherReason] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showProfileAlert, setShowProfileAlert] = useState(false);
+  const [images, setImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [imageError, setImageError] = useState("");
+  
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    
+    const files = Array.from(e.target.files);
+    const newImages = [...images, ...files];
+    
+    if (newImages.length > 6) {
+      setImageError('Maximum 6 images allowed');
+      return;
+    }
+    
+    if (newImages.length < 2) {
+      setImageError('Minimum 2 images required');
+    } else {
+      setImageError('');
+    }
+    
+    setImages(newImages);
+    
+    // Create previews for the new images
+    const newPreviews = files.map(file => URL.createObjectURL(file));
+    setImagePreviews(prev => [...prev, ...newPreviews]);
+  };
+  
+  const removeImage = (index: number) => {
+    const newImages = images.filter((_, i) => i !== index);
+    const newPreviews = imagePreviews.filter((_, i) => i !== index);
+    
+    setImages(newImages);
+    setImagePreviews(newPreviews);
+    
+    if (newImages.length < 2) {
+      setImageError('Minimum 2 images required');
+    } else {
+      setImageError('');
+    }
+  };
+  
+  const handleRequestReturn = async () => {
+    if (!profile?.full_name || !profile.phone || !profile.address) {
+      setShowProfileAlert(true);
+      return;
+    }
+    
+    // Validate image count
+    if (images.length < 2 || images.length > 6) {
+      setImageError('Please upload between 2 and 6 images');
+      return;
+    }
+
+    // Check if order is older than 7 days
+    const orderDate = new Date(order.created_at);
+    const currentDate = new Date();
+    const diffTime = Math.abs(currentDate.getTime() - orderDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays > 7) {
+      alert("Cannot return order. Order is older than 7 days.");
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      // Upload images to storage
+      const imageUrls: string[] = [];
+      
+      for (let i = 0; i < images.length; i++) {
+        const file = images[i];
+        const fileName = `${order.id}-return-${Date.now()}-${i}-${file.name}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('return-images')
+          .upload(fileName, file, { upsert: true });
+          
+        if (uploadError) throw uploadError;
+        
+        const { data: urlData } = supabase.storage
+          .from('return-images')
+          .getPublicUrl(fileName);
+          
+        if (urlData?.publicUrl) {
+          imageUrls.push(urlData.publicUrl);
+        }
+      }
+      
+      // Determine the actual return reason - if 'Other', use the custom reason
+      const actualReason = reason === 'Other' ? otherReason : reason;
+      
+      const { error } = await supabase
+        .from('returns')
+        .insert({
+          order_id: order.id,
+          customer_name: profile.full_name,
+          customer_phone: profile.phone,
+          customer_address: profile.address,
+          return_reason: actualReason,
+          return_status: 'requested',
+          images: imageUrls
+        });
+
+      if (error) throw error;
+
+      // Update the order's return status
+      await supabase
+        .from('orders')
+        .update({
+          return_status: 'requested',
+          return_reason: reason,
+          return_request_date: new Date().toISOString()
+        })
+        .eq('id', order.id);
+
+      toast.success('Return request submitted successfully!');
+      setOpen(false);
+      setReason("");
+      onReturnRequest(); // Refresh orders
+    } catch (error: any) {
+      console.error('Error requesting return:', error);
+      toast.error('Failed to submit return request');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            Request Return
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request Return</DialogTitle>
+            <DialogDescription>
+              Submit a return request for order {order.order_id}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {showProfileAlert && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+              <p className="text-sm text-yellow-700">
+                Please fill your profile details (name, phone, address) before requesting a return.
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="return-reason">Return Reason</Label>
+              <Select value={reason} onValueChange={setReason}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Wrong Size">Wrong Size</SelectItem>
+                  <SelectItem value="Damaged Product">Damaged Product</SelectItem>
+                  <SelectItem value="Not As Described">Not As Described</SelectItem>
+                  <SelectItem value="Changed Mind">Changed Mind</SelectItem>
+                  <SelectItem value="Quality Issues">Quality Issues</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {reason === 'Other' && (
+              <div>
+                <Label htmlFor="custom-reason">Please specify</Label>
+                <Textarea
+                  id="custom-reason"
+                  placeholder="Enter your reason here..."
+                  value={otherReason}
+                  onChange={(e) => setOtherReason(e.target.value)}
+                />
+              </div>
+            )}
+            
+            {/* Image Upload Section */}
+            <div>
+              <Label>Upload Images (minimum 2, maximum 6)</Label>
+              <div className="border-2 border-dashed border-border rounded-lg p-6 text-center transition-colors hover:border-primary/50">
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                  id={`return-image-upload-${order.id}`}
+                />
+                <label 
+                  htmlFor={`return-image-upload-${order.id}`} 
+                  className="cursor-pointer inline-block"
+                >
+                  <div className="flex flex-col items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-muted-foreground mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    <p className="text-sm text-muted-foreground">
+                      Click to upload images or drag and drop
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      PNG, JPG, GIF up to 5MB
+                    </p>
+                  </div>
+                </label>
+              </div>
+              
+              {imageError && (
+                <p className="text-sm text-destructive mt-1">{imageError}</p>
+              )}
+              
+              {/* Preview images */}
+              {imagePreviews.length > 0 && (
+                <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {imagePreviews.map((preview, index) => (
+                    <div key={index} className="relative group">
+                      <img 
+                        src={preview} 
+                        alt={`Preview ${index + 1}`} 
+                        className="w-full h-20 object-cover rounded-md border"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <p className="text-xs text-muted-foreground mt-2">
+                {images.length}/6 images uploaded
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRequestReturn} disabled={loading}>
+              {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Submit Return
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};

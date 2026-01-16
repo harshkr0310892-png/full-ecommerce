@@ -306,6 +306,11 @@ export type Database = {
           updated_at: string
           payment_method: string | null
           user_id: string | null
+          return_status: string | null
+          return_reason: string | null
+          return_request_date: string | null
+          return_processed_date: string | null
+          return_refund_amount: number | null
         }
         Insert: {
           created_at?: string
@@ -320,6 +325,11 @@ export type Database = {
           updated_at?: string
           payment_method?: string | null
           user_id?: string | null
+          return_status?: string | null
+          return_reason?: string | null
+          return_request_date?: string | null
+          return_processed_date?: string | null
+          return_refund_amount?: number | null
         }
         Update: {
           created_at?: string
@@ -334,6 +344,11 @@ export type Database = {
           updated_at?: string
           payment_method?: string | null
           user_id?: string | null
+          return_status?: string | null
+          return_reason?: string | null
+          return_request_date?: string | null
+          return_processed_date?: string | null
+          return_refund_amount?: number | null
         }
         Relationships: [
           {
@@ -341,6 +356,59 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      },
+      returns: {
+        Row: {
+          id: string
+          order_id: string
+          customer_name: string
+          customer_phone: string
+          customer_address: string
+          return_reason: string
+          return_status: string
+          requested_at: string
+          processed_at: string | null
+          refund_amount: number | null
+          admin_notes: string | null
+          images: string[] | null
+        }
+        Insert: {
+          id?: string
+          order_id: string
+          customer_name: string
+          customer_phone: string
+          customer_address: string
+          return_reason: string
+          return_status?: string
+          requested_at?: string
+          processed_at?: string | null
+          refund_amount?: number | null
+          admin_notes?: string | null
+          images?: string[] | null
+        }
+        Update: {
+          id?: string
+          order_id?: string
+          customer_name?: string
+          customer_phone?: string
+          customer_address?: string
+          return_reason?: string
+          return_status?: string
+          requested_at?: string
+          processed_at?: string | null
+          refund_amount?: number | null
+          admin_notes?: string | null
+          images?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "returns_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           }
         ]

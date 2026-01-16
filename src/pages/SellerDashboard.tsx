@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ProductVariantsEditor } from "@/components/admin/ProductVariantsEditor";
+import { PhotoViewerModal } from "@/components/PhotoViewerModal";
 
 interface Seller {
   id: string;
@@ -81,11 +82,16 @@ interface Order {
   customer_landmark3: string | null;
   customer_email: string | null;
   status: string;
-  payment_method: 'online' | 'cod';
+  payment_method: string | null;
   total: number;
   created_at: string;
   updated_at: string;
   delivery_boy_id: string | null;
+  return_status?: string | null;
+  return_reason?: string | null;
+  return_request_date?: string | null;
+  return_processed_date?: string | null;
+  return_refund_amount?: number | null;
 }
 
 interface OrderItem {
@@ -104,13 +110,36 @@ interface OrderMessage {
   created_at: string;
 }
 
+interface ReturnOrder {
+  id: string;
+  order_id: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_address: string;
+  return_reason: string;
+  return_status: string;
+  requested_at: string;
+  processed_at: string | null;
+  refund_amount: number | null;
+  admin_notes: string | null;
+  images: string[] | null;
+  order_details?: {
+    customer_name: string;
+    customer_phone: string;
+    customer_address: string;
+    status: string;
+    total: number;
+    created_at: string;
+  };
+}
+
 export default function SellerDashboard() {
   const navigate = useNavigate();
   const [isSellerLoggedIn, setIsSellerLoggedIn] = useState(false);
   const sellerEmail = sessionStorage.getItem("seller_email");
   const sellerName = sessionStorage.getItem("seller_name");
   const sellerId = sessionStorage.getItem("seller_id");
-  type TabValue = "products" | "attributes" | "orders" | "sales" | "delivery-boys" | "categories";
+  type TabValue = "products" | "attributes" | "orders" | "sales" | "delivery-boys" | "categories" | "return-orders";
   const [activeTab, setActiveTab] = useState<TabValue>("products");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -122,6 +151,19 @@ export default function SellerDashboard() {
   const [uploadingBrandLogo, setUploadingBrandLogo] = useState(false);
   const [productImages, setProductImages] = useState<string[]>([]);
   const [hasVariantImages, setHasVariantImages] = useState(false);
+  // Photo viewer modal state
+  const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
+  const [photoViewerPhotos, setPhotoViewerPhotos] = useState<string[]>([]);
+  const [photoViewerIndex, setPhotoViewerIndex] = useState(0);
+  
+  // Debug: Log when photo viewer state changes
+  useEffect(() => {
+    console.log('🖼️ Photo Viewer State:', { 
+      isOpen: photoViewerOpen, 
+      photos: photoViewerPhotos, 
+      index: photoViewerIndex 
+    });
+  }, [photoViewerOpen, photoViewerPhotos, photoViewerIndex]);
   const [orderItems, setOrderItems] = useState<Record<string, { id: string; order_id: string; product_id: string; quantity: number; product_name?: string; product_price?: number; variant_info?: { attribute_name?: string; value_name?: string; variant_id?: string } | null }[]>>({});
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderMessages, setOrderMessages] = useState<Record<string, OrderMessage[]>>({});
@@ -283,7 +325,7 @@ export default function SellerDashboard() {
         .eq("seller_id", id)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data as Product[];
+      return data as unknown as Product[];
     },
     enabled: !!(seller?.id || sellerId),
   });
@@ -402,11 +444,11 @@ export default function SellerDashboard() {
 
       const orderIdsSet = new Set<string>();
 
-      // (A) Snapshot-based lookup
+      // (A) Snapshot-based lookup - using product_id instead of seller_id
       const { data: snapshotItems, error: snapshotError } = await supabase
         .from("order_items")
         .select("order_id")
-        .eq("seller_id", id);
+        .in('product_id', (sellerProducts || []).map(p => p.id));
       if (snapshotError) throw snapshotError;
       (snapshotItems || []).forEach((it: any) => orderIdsSet.add(it.order_id as string));
 
@@ -428,7 +470,7 @@ export default function SellerDashboard() {
         .order("created_at", { ascending: false });
       if (ordersError) throw ordersError;
 
-      return (filteredOrders || []) as Order[];
+      return (filteredOrders || []) as unknown as Order[];
     },
     enabled: !!(seller?.id || sellerId),
   });
@@ -532,7 +574,108 @@ export default function SellerDashboard() {
         .eq("seller_id", id)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data as Product[];
+      return data as unknown as Product[];
+    },
+    enabled: !!(seller?.id || sellerId),
+  });
+
+  // Fetch return orders for seller's products
+  const { data: returnOrders, isLoading: returnOrdersLoading, refetch: refetchReturnOrders } = useQuery({
+    queryKey: ["seller-return-orders", seller?.id || sellerId],
+    queryFn: async () => {
+      const id = seller?.id || sellerId;
+      if (!id) return [];
+      
+      console.log('🔍 DEBUG: Fetching return orders for seller:', { id, sellerProductsCount: sellerProducts?.length });
+      
+      // Get all order_ids where order_items contain products from this seller
+      const productIds = (sellerProducts || []).map(p => p.id);
+      console.log('🔍 DEBUG: Seller product IDs:', productIds);
+      
+      const { data: orderItems, error: orderItemsError } = await supabase
+        .from('order_items')
+        .select('order_id')
+        .in('product_id', productIds) as { data: Array<{order_id: string}>; error: any };
+      
+      if (orderItemsError) {
+        console.error('❌ DEBUG: Error fetching order items:', orderItemsError);
+        throw orderItemsError;
+      }
+      
+      console.log('🔍 DEBUG: Found order items:', orderItems?.length || 0);
+      
+      if (!orderItems || orderItems.length === 0) {
+        console.log('🔍 DEBUG: No order items found for seller products');
+        return [];
+      }
+      
+      const orderIds = orderItems.map(oi => oi.order_id);
+      console.log('🔍 DEBUG: Order IDs to check for returns:', orderIds);
+      
+      // Get returns for these orders
+      const { data: returns, error: returnsError } = await supabase
+        .from('returns')
+        .select('*')
+        .in('order_id', orderIds)
+        .order('requested_at', { ascending: false });
+      
+      if (returnsError) {
+        console.error('❌ DEBUG: Error fetching returns:', returnsError);
+        throw returnsError;
+      }
+      
+      console.log('🔍 DEBUG: Found returns:', returns?.length || 0);
+      console.log('🔍 DEBUG: Returns data:', returns);
+      
+      if (!returns || returns.length === 0) {
+        console.log('🔍 DEBUG: No returns found for these orders');
+        return [];
+      }
+      
+      // Get order details for each return
+      const returnOrdersWithDetails = await Promise.all(
+        (returns || []).map(async (ret: any) => {
+          const { data: order, error: orderError } = await supabase
+            .from('orders')
+            .select('customer_name, customer_phone, customer_address, status, total, created_at')
+            .eq('id', ret.order_id)
+            .single();
+          
+          if (orderError) {
+            console.error('Error fetching order details:', orderError);
+            return {
+              ...ret,
+              order_details: {
+                customer_name: ret.customer_name,
+                customer_phone: ret.customer_phone,
+                customer_address: ret.customer_address,
+                status: 'N/A',
+                total: 0,
+                created_at: ret.requested_at
+              }
+            };
+          }
+          
+          return {
+            ...ret,
+            order_details: order
+          };
+        })
+      );
+      
+      console.log('🔍 DEBUG: Final return orders with details:', returnOrdersWithDetails);
+      
+      // Log image data specifically
+      returnOrdersWithDetails.forEach((order, idx) => {
+        console.log(`📋 Return Order ${idx + 1}:`, {
+          id: order.id,
+          hasImages: !!order.images,
+          imageCount: order.images?.length || 0,
+          images: order.images
+        });
+      });
+      
+      return returnOrdersWithDetails as unknown as ReturnOrder[];
     },
     enabled: !!(seller?.id || sellerId),
   });
@@ -934,6 +1077,13 @@ export default function SellerDashboard() {
                       <Package className="w-4 h-4 mr-2" /> Delivery Boys
                     </Button>
                     <Button
+                      variant={activeTab === "return-orders" ? "royal" : "ghost"}
+                      className="justify-start"
+                      onClick={() => { setActiveTab("return-orders"); setMobileMenuOpen(false); }}
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" /> Return Orders
+                    </Button>
+                    <Button
                       variant={activeTab === "categories" ? "royal" : "ghost"}
                       className="justify-start"
                       onClick={() => { setActiveTab("categories"); setMobileMenuOpen(false); }}
@@ -967,6 +1117,10 @@ export default function SellerDashboard() {
             <TabsTrigger value="delivery-boys" className="flex items-center gap-2 whitespace-nowrap w-full justify-start sm:w-auto sm:justify-center">
               <Package className="w-4 h-4" />
               Delivery Boys
+            </TabsTrigger>
+            <TabsTrigger value="return-orders" className="flex items-center gap-2 whitespace-nowrap w-full justify-start sm:w-auto sm:justify-center">
+              <RefreshCw className="w-4 h-4" />
+              Return Orders
             </TabsTrigger>
             <TabsTrigger value="categories" className="flex items-center gap-2 whitespace-nowrap w-full justify-start sm:w-auto sm:justify-center">
               <Tag className="w-4 h-4" />
@@ -1933,6 +2087,131 @@ export default function SellerDashboard() {
           <TabsContent value="delivery-boys" className="space-y-6">
             <DeliveryBoysManager sellerId={sellerId || undefined} />
           </TabsContent>
+          <TabsContent value="return-orders" className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <h2 className="font-display text-2xl font-bold">Return Requests</h2>
+                <Button variant="ghost" size="icon" onClick={() => refetchReturnOrders()}>
+                  <RefreshCw className="w-4 h-4" />
+                </Button>
+                {/* Test button for photo viewer */}
+
+              </div>
+            </div>
+            {returnOrdersLoading ? (
+              <div className="text-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+              </div>
+            ) : returnOrders && returnOrders.length > 0 ? (
+              <div className="space-y-4">
+                {returnOrders.map((returnOrder) => (
+                  <div key={returnOrder.id} className="p-4 bg-card rounded-xl border border-border/50">
+                    <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Return ID</p>
+                        <p className="font-display text-xl font-bold text-foreground">{returnOrder.id.substring(0, 8)}...</p>
+                        <div className="mt-1">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-foreground">
+                            {returnOrder.return_status === 'requested' ? 'Pending Review' : returnOrder.return_status.charAt(0).toUpperCase() + returnOrder.return_status.slice(1)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Request Date</p>
+                        <p className="font-display text-lg font-bold">{new Date(returnOrder.requested_at).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="mb-3 p-3 bg-muted/30 rounded-lg">
+                      <p className="text-sm font-medium mb-2 text-foreground">Return Reason:</p>
+                      <p className="text-base">{returnOrder.return_reason}</p>
+                      {returnOrder.return_reason.toLowerCase() === 'other' && returnOrder.admin_notes && (
+                        <div className="mt-2 p-2 bg-background rounded border border-border">
+                          <p className="text-sm font-medium text-muted-foreground">Please specify:</p>
+                          <p className="text-sm">{returnOrder.admin_notes}</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Images Section */}
+                    {returnOrder.images && returnOrder.images.length > 0 && (
+                      <div className="mb-3 p-3 bg-muted/30 rounded-lg">
+                        <p className="text-sm font-medium mb-2 text-foreground">Return Images:</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {returnOrder.images.map((imageUrl, index) => (
+                            <div key={index} className="relative group">
+                              <img 
+                                src={imageUrl} 
+                                alt={`Return image ${index + 1}`} 
+                                className="w-full h-24 object-cover rounded-md border border-border cursor-pointer hover:opacity-90 transition-opacity"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  console.log('📸 Image clicked!', { 
+                                    imageUrl, 
+                                    index, 
+                                    totalImages: returnOrder.images?.length,
+                                    imagesArray: returnOrder.images 
+                                  });
+                                  try {
+                                    setPhotoViewerPhotos(returnOrder.images);
+                                    setPhotoViewerIndex(index);
+                                    setPhotoViewerOpen(true);
+                                    console.log('📷 Setting photo viewer state:', {
+                                      photos: returnOrder.images,
+                                      index: index,
+                                      open: true
+                                    });
+                                    console.log('✅ Photo viewer opened');
+                                  } catch (error) {
+                                    console.error('Error opening photo viewer:', error);
+                                  }
+                                }}
+                              />
+                              <div className="absolute inset-0 bg-black/20 rounded-md opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <span className="text-white text-xs font-medium">Click to view</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {returnOrder.images.length} image{returnOrder.images.length !== 1 ? 's' : ''} attached
+                        </p>
+                      </div>
+                    )}
+                    
+                    <div className="space-y-3 mb-3">
+                      <div>
+                        <p className="text-sm text-foreground">Customer Details</p>
+                        <p className="font-semibold text-base">{returnOrder.customer_name}</p>
+                        <p className="text-sm text-muted-foreground">{returnOrder.customer_phone}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Address</p>
+                        <div className="bg-muted/20 rounded-lg p-3 space-y-1">
+                          <p className="text-sm">{returnOrder.customer_address}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t border-border/50">
+                      <div className="text-sm text-muted-foreground">
+                        Order ID: {returnOrder.order_id.substring(0, 8)}...
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Requested: {new Date(returnOrder.requested_at).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-card rounded-xl border border-border/50">
+                <RefreshCw className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-muted-foreground">No return requests found.</p>
+              </div>
+            )}
+          </TabsContent>
           <TabsContent value="categories" className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
@@ -2057,6 +2336,15 @@ export default function SellerDashboard() {
           </TabsContent>
         </Tabs>
       </main>
+      
+      {/* Photo Viewer Modal */}
+      {photoViewerOpen && (
+        <PhotoViewerModal
+          photoUrls={photoViewerPhotos}
+          initialIndex={photoViewerIndex}
+          onClose={() => setPhotoViewerOpen(false)}
+        />
+      )}
     </div>
   );
 }
