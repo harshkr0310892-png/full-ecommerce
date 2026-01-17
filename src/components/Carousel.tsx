@@ -28,7 +28,7 @@ const DEFAULT_ITEMS: CarouselItem[] = [
     title: 'Lightning Fast Delivery',
     description: 'Get your orders delivered within 2-3 business days. Free shipping on orders above ₹499.',
     id: 1,
-    icon: <Truck className="h-[20px] w-[20px] text-white" />
+    icon: <Truck className="h-[30px] w-[30px] text-white" />
   },
   {
     title: '100% Secure Payments',

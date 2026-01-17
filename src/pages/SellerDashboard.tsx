@@ -467,6 +467,7 @@ export default function SellerDashboard() {
         .from("orders")
         .select("*")
         .in("id", orderIds)
+        .eq("seller_deleted", false)
         .order("created_at", { ascending: false });
       if (ordersError) throw ordersError;
 
@@ -963,16 +964,19 @@ export default function SellerDashboard() {
 
   const deleteOrderMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("orders").delete().eq("id", id);
+      const { error } = await supabase
+        .from("orders")
+        .update({ seller_deleted: true, seller_deleted_at: new Date().toISOString() } as any)
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["seller-orders", seller?.id || sellerId] });
-      toast.success("Order deleted!");
+      toast.success("Order removed from your list");
     },
     onError: (error) => {
       console.error("Error deleting order:", error);
-      toast.error("Failed to delete order");
+      toast.error("Failed to remove order");
     },
   });
 
