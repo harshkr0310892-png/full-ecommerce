@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Store, LogOut, Loader2, RefreshCw, Package, Tag, ShoppingBag, Upload, Edit2, Trash2, X, TrendingUp, Calendar, DollarSign, BarChart3, MessageCircle, Send, Menu } from "lucide-react";
+import { Store, LogOut, Loader2, RefreshCw, Package, Tag, ShoppingBag, Upload, Edit2, Trash2, X, TrendingUp, Calendar, DollarSign, BarChart3, MessageCircle, Send, Menu, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -67,6 +67,18 @@ interface Category {
   is_active: boolean;
   created_at: string;
   parent_id?: string | null;
+}
+
+interface ProductReview {
+  id: string;
+  product_id: string;
+  user_id: string;
+  rating: number;
+  description: string;
+  reviewer_name: string | null;
+  reviewer_avatar_url: string | null;
+  created_at: string;
+  product_review_images?: { image_url: string }[];
 }
 
 interface Order {
@@ -139,7 +151,7 @@ export default function SellerDashboard() {
   const sellerEmail = sessionStorage.getItem("seller_email");
   const sellerName = sessionStorage.getItem("seller_name");
   const sellerId = sessionStorage.getItem("seller_id");
-  type TabValue = "products" | "attributes" | "orders" | "sales" | "delivery-boys" | "categories" | "return-orders";
+  type TabValue = "products" | "attributes" | "orders" | "sales" | "delivery-boys" | "return-orders" | "reviews" | "categories";
   const [activeTab, setActiveTab] = useState<TabValue>("products");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -329,6 +341,92 @@ export default function SellerDashboard() {
     },
     enabled: !!(seller?.id || sellerId),
   });
+
+  const sellerProductIds = (products || []).map((p) => p.id);
+
+  const { data: productReviewSummaries, refetch: refetchProductReviewSummaries } = useQuery({
+    queryKey: ['seller-product-review-summaries', seller?.id || sellerId, sellerProductIds.join(',')],
+    queryFn: async () => {
+      if (!sellerProductIds.length) return {} as Record<string, { avg_rating: number; review_count: number }>;
+      const { data, error } = await supabase
+        .from('product_review_summary' as any)
+        .select('product_id, avg_rating, review_count')
+        .in('product_id', sellerProductIds);
+      if (error) throw error;
+      return (data || []).reduce((acc: Record<string, { avg_rating: number; review_count: number }>, row: any) => {
+        acc[row.product_id] = { avg_rating: Number(row.avg_rating || 0), review_count: Number(row.review_count || 0) };
+        return acc;
+      }, {} as Record<string, { avg_rating: number; review_count: number }>);
+    },
+    enabled: !!(seller?.id || sellerId),
+    staleTime: 60 * 1000,
+  });
+
+  const [selectedReviewProductId, setSelectedReviewProductId] = useState<string | null>(null);
+  const [selectedReviewStars, setSelectedReviewStars] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (activeTab !== 'reviews') return;
+    if (selectedReviewProductId) return;
+    if (products && products.length > 0) setSelectedReviewProductId(products[0].id);
+  }, [activeTab, products, selectedReviewProductId]);
+
+  const selectedReviewProduct = (products || []).find((p) => p.id === selectedReviewProductId) || null;
+  const selectedReviewProductImageUrl = selectedReviewProduct?.images?.[0] || selectedReviewProduct?.image_url || null;
+
+  const { data: selectedProductReviews, isLoading: selectedReviewsLoading, refetch: refetchSelectedProductReviews } = useQuery({
+    queryKey: ['seller-product-reviews', selectedReviewProductId],
+    queryFn: async () => {
+      if (!selectedReviewProductId) return [] as ProductReview[];
+      const { data, error } = await supabase
+        .from('product_reviews' as any)
+        .select('id, product_id, user_id, rating, description, reviewer_name, reviewer_avatar_url, created_at, product_review_images(image_url)')
+        .eq('product_id', selectedReviewProductId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []) as ProductReview[];
+    },
+    enabled: activeTab === 'reviews' && !!selectedReviewProductId,
+  });
+
+  const selectedReviews = selectedProductReviews || [];
+  const selectedReviewsCount = selectedReviews.length;
+  const selectedAvgRating = selectedReviewsCount
+    ? selectedReviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / selectedReviewsCount
+    : 0;
+  const selectedRatingCounts = [1, 2, 3, 4, 5].reduce((acc, v) => {
+    acc[v] = selectedReviews.filter((r) => Number(r.rating) === v).length;
+    return acc;
+  }, {} as Record<number, number>);
+  const filteredSelectedReviews = selectedReviewStars
+    ? selectedReviews.filter((r) => Number(r.rating) === selectedReviewStars)
+    : selectedReviews;
+
+  const renderStars = (value: number, size = 16) => {
+    const rounded = Math.round(value * 10) / 10;
+    const fullCount = Math.floor(rounded);
+    const hasHalf = rounded - fullCount >= 0.5;
+    return (
+      <div className="flex items-center gap-0.5">
+        {Array.from({ length: 5 }).map((_, i) => {
+          const idx = i + 1;
+          const isFull = idx <= fullCount;
+          const isHalf = !isFull && hasHalf && idx === fullCount + 1;
+          return (
+            <span key={idx} className="relative inline-flex" style={{ width: size, height: size }}>
+              <Star className="h-full w-full text-amber-400/40" />
+              {(isFull || isHalf) && (
+                <Star
+                  className="absolute inset-0 h-full w-full text-amber-400 fill-amber-400"
+                  style={isHalf ? ({ clipPath: 'inset(0 50% 0 0)' } as any) : undefined}
+                />
+              )}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
 
   const { data: categories, refetch: refetchCategories } = useQuery({
     queryKey: ["public-categories"],
@@ -1074,6 +1172,13 @@ export default function SellerDashboard() {
                       <TrendingUp className="w-4 h-4 mr-2" /> Sales
                     </Button>
                     <Button
+                      variant={activeTab === "reviews" ? "royal" : "ghost"}
+                      className="justify-start"
+                      onClick={() => { setActiveTab("reviews"); setMobileMenuOpen(false); }}
+                    >
+                      <Star className="w-4 h-4 mr-2" /> Reviews
+                    </Button>
+                    <Button
                       variant={activeTab === "delivery-boys" ? "royal" : "ghost"}
                       className="justify-start"
                       onClick={() => { setActiveTab("delivery-boys"); setMobileMenuOpen(false); }}
@@ -1117,6 +1222,10 @@ export default function SellerDashboard() {
             <TabsTrigger value="sales" className="flex items-center gap-2 whitespace-nowrap w-full justify-start sm:w-auto sm:justify-center">
               <TrendingUp className="w-4 h-4" />
               Sales
+            </TabsTrigger>
+            <TabsTrigger value="reviews" className="flex items-center gap-2 whitespace-nowrap w-full justify-start sm:w-auto sm:justify-center">
+              <Star className="w-4 h-4" />
+              Reviews
             </TabsTrigger>
             <TabsTrigger value="delivery-boys" className="flex items-center gap-2 whitespace-nowrap w-full justify-start sm:w-auto sm:justify-center">
               <Package className="w-4 h-4" />
@@ -1833,6 +1942,260 @@ export default function SellerDashboard() {
               </div>
             </div>
           </TabsContent>
+
+          <TabsContent value="reviews" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-2xl font-bold">Product Reviews</h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  refetchProductReviewSummaries();
+                  refetchSelectedProductReviews();
+                }}
+              >
+                <RefreshCw className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {!products || products.length === 0 ? (
+              <div className="text-center py-12 bg-card rounded-xl border border-border/50">
+                <Package className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-muted-foreground">Add products to see reviews.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="font-display">Select Product</CardTitle>
+                    <CardDescription>Choose a product to see its reviews</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Select
+                      value={selectedReviewProductId || ''}
+                      onValueChange={(v) => {
+                        setSelectedReviewProductId(v);
+                        setSelectedReviewStars(null);
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        {selectedReviewProduct ? (
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-8 h-8 rounded-md overflow-hidden border border-border bg-muted flex-shrink-0">
+                              {selectedReviewProductImageUrl ? (
+                                <img
+                                  src={selectedReviewProductImageUrl}
+                                  alt={selectedReviewProduct.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground">
+                                  Img
+                                </div>
+                              )}
+                            </div>
+                            <span className="truncate">{selectedReviewProduct.name}</span>
+                          </div>
+                        ) : (
+                          <SelectValue placeholder="Select product" />
+                        )}
+                      </SelectTrigger>
+                      <SelectContent>
+                        {products.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-7 h-7 rounded-md overflow-hidden border border-border bg-muted flex-shrink-0">
+                                {(p.images?.[0] || p.image_url) ? (
+                                  <img
+                                    src={(p.images?.[0] || p.image_url) as string}
+                                    alt={p.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground">
+                                    Img
+                                  </div>
+                                )}
+                              </div>
+                              <span className="truncate">{p.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {selectedReviewProduct && (
+                      <div className="mt-4 rounded-lg border border-border/50 bg-[hsl(159.92deg,52.26%,28.54%,0.12)] px-3 py-2 flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-md overflow-hidden border border-border bg-background flex-shrink-0">
+                          {selectedReviewProductImageUrl ? (
+                            <img
+                              src={selectedReviewProductImageUrl}
+                              alt={selectedReviewProduct.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground">
+                              Img
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs text-muted-foreground">Selected product</div>
+                          <div className="font-medium truncate">{selectedReviewProduct.name}</div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {selectedReviewProduct && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                    <Card className="md:col-span-1">
+                      <CardHeader>
+                        <CardTitle className="font-display text-lg">Summary</CardTitle>
+                        <CardDescription>{selectedReviewProduct.name}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center gap-3">
+                          {renderStars(
+                            productReviewSummaries?.[selectedReviewProduct.id]?.avg_rating ?? selectedAvgRating,
+                            18
+                          )}
+                          <div>
+                            <div className="text-sm text-muted-foreground">Average</div>
+                            <div className="text-xl font-bold">
+                              {(productReviewSummaries?.[selectedReviewProduct.id]?.avg_rating ?? selectedAvgRating).toFixed(1)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-4 text-sm text-muted-foreground">
+                          Total reviews: {productReviewSummaries?.[selectedReviewProduct.id]?.review_count ?? selectedReviewsCount}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="md:col-span-2">
+                      <CardHeader>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                          <div>
+                            <CardTitle className="font-display text-lg">Rating Breakdown</CardTitle>
+                            <CardDescription>Click a rating to filter</CardDescription>
+                          </div>
+                          {selectedReviewStars && (
+                            <Button variant="ghost" size="sm" onClick={() => setSelectedReviewStars(null)}>
+                              Clear
+                            </Button>
+                          )}
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {[5, 4, 3, 2, 1].map((star) => {
+                            const count = selectedRatingCounts[star] || 0;
+                            const pct = selectedReviewsCount ? Math.round((count / selectedReviewsCount) * 100) : 0;
+                            return (
+                              <button
+                                key={star}
+                                type="button"
+                                onClick={() => setSelectedReviewStars(star)}
+                                className={cn(
+                                  'w-full flex items-center gap-2 rounded-md px-1 py-1.5 hover:bg-muted/40 transition-colors',
+                                  selectedReviewStars === star && 'bg-muted/40'
+                                )}
+                              >
+                                <div className="flex items-center gap-1 w-14">
+                                  <span className="text-sm font-medium">{star}</span>
+                                  <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                                </div>
+                                <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                                  <div className="h-full bg-amber-400" style={{ width: `${pct}%` }} />
+                                </div>
+                                <div className="w-10 text-right text-sm text-muted-foreground">{count}</div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="font-display text-lg">Reviews</CardTitle>
+                      {selectedReviewStars && (
+                        <div className="text-sm text-muted-foreground">Filtered: {selectedReviewStars}★</div>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedReviewsLoading ? (
+                      <div className="text-center py-10">
+                        <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+                      </div>
+                    ) : filteredSelectedReviews.length ? (
+                      <div className="space-y-4">
+                        {filteredSelectedReviews.map((r) => (
+                          <div key={r.id} className="rounded-lg border border-border/50 p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 rounded-full overflow-hidden border border-border bg-muted flex-shrink-0">
+                                {r.reviewer_avatar_url ? (
+                                  <img src={r.reviewer_avatar_url} alt={r.reviewer_name || 'User'} className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">User</div>
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="font-medium truncate">{r.reviewer_name || 'Customer'}</div>
+                                    <div className="mt-1 flex items-center gap-2">
+                                      {renderStars(Number(r.rating) || 0, 14)}
+                                      <span className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <p className="mt-3 text-sm text-muted-foreground whitespace-pre-line">{r.description}</p>
+
+                                {Array.isArray(r.product_review_images) && r.product_review_images.length > 0 && (
+                                  <div className="mt-3 grid grid-cols-3 sm:grid-cols-6 gap-2">
+                                    {r.product_review_images.slice(0, 6).map((img, idx) => (
+                                      <button
+                                        key={`${r.id}_${idx}`}
+                                        type="button"
+                                        className="aspect-square rounded-md overflow-hidden border border-border bg-muted"
+                                        onClick={() => {
+                                          const photos = (r.product_review_images || []).map((x) => x.image_url);
+                                          setPhotoViewerPhotos(photos);
+                                          setPhotoViewerIndex(idx);
+                                          setPhotoViewerOpen(true);
+                                        }}
+                                      >
+                                        <img src={img.image_url} alt="Review" className="w-full h-full object-cover" />
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <Star className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+                        <p className="text-sm text-muted-foreground">
+                          {selectedReviewStars ? 'No reviews for this rating yet.' : 'No reviews for this product yet.'}
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </TabsContent>
+
           <TabsContent value="orders" className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex items-center gap-3">

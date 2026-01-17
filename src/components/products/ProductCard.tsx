@@ -1,11 +1,11 @@
 import { Link, useNavigate } from "react-router-dom";
-import { ShoppingBag, Eye, Share2, Crown, Heart } from "lucide-react";
+import { ShoppingBag, Eye, Share2, Crown, Heart, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCartStore } from "@/store/cartStore";
 import { useWishlistStore } from "@/store/wishlistStore";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
@@ -42,6 +42,50 @@ export function ProductCard({
   const isLowStock = stock_status === 'low_stock';
   const displayImage = (images && images.length > 0) ? images[0] : image_url;
   const isWishlisted = isInWishlist(id);
+
+  const { data: reviewSummary } = useQuery({
+    queryKey: ['product-review-summary', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('product_review_summary' as any)
+        .select('avg_rating, review_count')
+        .eq('product_id', id)
+        .maybeSingle();
+      if (error) throw error;
+      return (data || null) as null | { avg_rating: number; review_count: number };
+    },
+    enabled: !!id,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const avgRating = Number((reviewSummary as any)?.avg_rating || 0);
+  const reviewCount = Number((reviewSummary as any)?.review_count || 0);
+
+  const renderStars = (value: number) => {
+    const rounded = Math.round(value * 10) / 10;
+    const fullCount = Math.floor(rounded);
+    const hasHalf = rounded - fullCount >= 0.5;
+    return (
+      <div className="flex items-center gap-0.5">
+        {Array.from({ length: 5 }).map((_, i) => {
+          const idx = i + 1;
+          const isFull = idx <= fullCount;
+          const isHalf = !isFull && hasHalf && idx === fullCount + 1;
+          return (
+            <span key={idx} className="relative inline-flex" style={{ width: 14, height: 14 }}>
+              <Star className="h-full w-full text-amber-400/40" />
+              {(isFull || isHalf) && (
+                <Star
+                  className="absolute inset-0 h-full w-full text-amber-400 fill-amber-400"
+                  style={isHalf ? ({ clipPath: 'inset(0 50% 0 0)' } as any) : undefined}
+                />
+              )}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
 
   // Check if product has variants
   const { data: variants, isLoading: variantsLoading } = useQuery({
@@ -274,6 +318,18 @@ export function ProductCard({
         <h3 className="font-display text-sm lg:text-base font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
           {name}
         </h3>
+
+        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+          {reviewCount > 0 ? (
+            <>
+              {renderStars(avgRating)}
+              <span className="font-medium text-foreground">{avgRating.toFixed(1)}</span>
+              <span>({reviewCount})</span>
+            </>
+          ) : (
+            <span>No reviews</span>
+          )}
+        </div>
         
         <div className="mt-1 flex items-center gap-2">
           {discount_percentage > 0 ? (
