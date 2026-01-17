@@ -229,12 +229,12 @@ Deno.serve(async (req: Request) => {
 
     if (action === "request") {
       const email = (body?.email ?? "").toString().trim().toLowerCase();
-      if (!isValidEmail(email)) return json({ ok: true });
+      if (!isValidEmail(email)) return json({ error: "Invalid email" }, { status: 200 });
 
       const user = await authUserByEmail({ supabaseUrl: SUPABASE_URL, serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY, email });
 
       if (!user) {
-        return json({ ok: true });
+        return json({ error: "You didn't create any account from this email" }, { status: 200 });
       }
 
       const otp = randomDigits(6);
