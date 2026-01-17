@@ -207,6 +207,7 @@ export default function AdminDashboard() {
       | "coupons"
       | "banned"
       | "contacts"
+      | "newsletter"
       | "cod-restrictions"
       | "individual-phone-restrictions"
       | "sellers"
@@ -343,6 +344,7 @@ export default function AdminDashboard() {
     const [contactFilterType, setContactFilterType] = useState('all');
     const [orderFilter, setOrderFilter] = useState('');
     const [orderFilterType, setOrderFilterType] = useState('all');
+    const [newsletterFilter, setNewsletterFilter] = useState('');
 
   // Check admin login on mount
   useEffect(() => {
@@ -427,6 +429,57 @@ export default function AdminDashboard() {
       return data as ContactSubmission[];
     },
   });
+
+  // Fetch newsletter subscribers
+  const { data: newsletterSubscribers, isLoading: newsletterLoading, refetch: refetchNewsletter } = useQuery({
+    queryKey: ['admin-newsletter-subscribers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('newsletter_subscriptions')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as { id: string; email: string; created_at: string; is_active: boolean; unsubscribed_at: string | null }[];
+    },
+  });
+
+  const filteredNewsletterSubscribers = newsletterSubscribers?.filter((sub) => {
+    if (!newsletterFilter) return true;
+    return sub.email?.toUpperCase().includes(newsletterFilter.toUpperCase());
+  });
+
+  const downloadNewsletterCsv = () => {
+    const rows = (filteredNewsletterSubscribers || [])
+      .map((s) => ({
+        email: s.email,
+        created_at: s.created_at,
+        is_active: s.is_active,
+        unsubscribed_at: s.unsubscribed_at,
+      }));
+
+    const escapeCell = (value: unknown) => {
+      const str = value === null || value === undefined ? '' : String(value);
+      const escaped = str.replace(/"/g, '""');
+      return /[\n\r,\"]/.test(escaped) ? `"${escaped}"` : escaped;
+    };
+
+    const header = ['email', 'created_at', 'is_active', 'unsubscribed_at'];
+    const lines = [
+      header.join(','),
+      ...rows.map((r) => header.map((k) => escapeCell((r as any)[k])).join(',')),
+    ];
+
+    const csv = `\ufeff${lines.join('\n')}`;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `newsletter_subscribers_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   // Add fetch COD restrictions query
   const { data: codRestrictions, isLoading: codRestrictionsLoading, refetch: refetchCodRestrictions } = useQuery({
@@ -1652,6 +1705,9 @@ export default function AdminDashboard() {
                     <Button variant={activeTab === "contacts" ? "royal" : "ghost"} className="justify-start" onClick={() => { setActiveTab("contacts"); setMobileMenuOpen(false); }}>
                       <MessageCircle className="w-4 h-4 mr-2" /> Contact Submissions
                     </Button>
+                    <Button variant={activeTab === "newsletter" ? "royal" : "ghost"} className="justify-start" onClick={() => { setActiveTab("newsletter"); setMobileMenuOpen(false); }}>
+                      <Mail className="w-4 h-4 mr-2" /> Newsletter
+                    </Button>
                     <Button variant={activeTab === "cod-restrictions" ? "royal" : "ghost"} className="justify-start" onClick={() => { setActiveTab("cod-restrictions"); setMobileMenuOpen(false); }}>
                       <DollarSign className="w-4 h-4 mr-2" /> COD Restrictions
                     </Button>
@@ -1688,6 +1744,10 @@ export default function AdminDashboard() {
               <TabsTrigger value="contacts" className="flex items-center gap-2 whitespace-nowrap w-full justify-start sm:w-auto sm:justify-center">
                 <MessageCircle className="w-4 h-4" />
                 Contact Submissions
+              </TabsTrigger>
+              <TabsTrigger value="newsletter" className="flex items-center gap-2 whitespace-nowrap w-full justify-start sm:w-auto sm:justify-center">
+                <Mail className="w-4 h-4" />
+                Newsletter
               </TabsTrigger>
               <TabsTrigger value="cod-restrictions" className="flex items-center gap-2 whitespace-nowrap w-full justify-start sm:w-auto sm:justify-center">
                 <DollarSign className="w-4 h-4" />
@@ -3176,6 +3236,81 @@ export default function AdminDashboard() {
               </div>
             </div>
           </TabsContent>)}
+
+          <TabsContent value="newsletter" className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="font-display text-2xl font-bold">Newsletter Subscribers</h2>
+                <p className="text-sm text-muted-foreground">
+                  Total: {(newsletterSubscribers || []).length}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <div className="relative">
+                  <Input
+                    placeholder="Search email..."
+                    value={newsletterFilter}
+                    onChange={(e) => setNewsletterFilter(e.target.value)}
+                    className="pr-8 w-64 max-w-full"
+                  />
+                  {newsletterFilter && (
+                    <button
+                      onClick={() => setNewsletterFilter('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                <Button
+                  variant="royalOutline"
+                  onClick={downloadNewsletterCsv}
+                  disabled={!filteredNewsletterSubscribers || filteredNewsletterSubscribers.length === 0}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download CSV
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => refetchNewsletter()}>
+                  <RefreshCw className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            {newsletterLoading ? (
+              <div className="text-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+              </div>
+            ) : filteredNewsletterSubscribers && filteredNewsletterSubscribers.length > 0 ? (
+              <div className="grid gap-3">
+                {filteredNewsletterSubscribers.map((sub) => (
+                  <div
+                    key={sub.id}
+                    className="flex items-center justify-between p-3 bg-card rounded-lg border border-border/50"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{sub.email}</div>
+                      <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-2">
+                        <span>Subscribed: {new Date(sub.created_at).toLocaleDateString()}</span>
+                        <span>
+                          Status: {sub.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                        {sub.unsubscribed_at && (
+                          <span>Unsubscribed: {new Date(sub.unsubscribed_at).toLocaleDateString()}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-card rounded-xl border border-border/50">
+                <Mail className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-muted-foreground">
+                  {newsletterFilter ? 'No matching subscribers found.' : 'No newsletter subscribers yet.'}
+                </p>
+              </div>
+            )}
+          </TabsContent>
 
           
 
