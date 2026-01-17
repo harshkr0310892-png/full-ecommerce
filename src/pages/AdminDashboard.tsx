@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { 
   Crown, LogOut, Plus, Package, Trash2, 
   Edit2, Loader2, RefreshCw, Upload, X, Ticket, Send, MessageCircle, Bell, Tag,
-  DollarSign, ZoomIn, Phone, Menu, ShoppingBag, Calendar, TrendingUp, BarChart3, Mail, Download
+  DollarSign, ZoomIn, Phone, Menu, ShoppingBag, Calendar, TrendingUp, BarChart3, Mail, Download, Star
 } from "lucide-react";
 import { PhotoViewerModal } from "@/components/PhotoViewerModal";
 import { cn } from "@/lib/utils";
@@ -169,6 +169,19 @@ interface SellerProfitRow {
   seller_email?: string | null;
 }
 
+interface SellerReviewSummaryRow {
+  seller_id: string;
+  seller_name: string;
+  seller_email: string;
+  product_count: number;
+  review_count: number;
+  avg_rating: number;
+  best_product_id: string | null;
+  best_product_name: string | null;
+  best_product_avg_rating: number | null;
+  best_product_review_count: number | null;
+}
+
 interface CodRestriction {
   id: string;
   phone_order_limit: number;
@@ -211,6 +224,7 @@ export default function AdminDashboard() {
       | "cod-restrictions"
       | "individual-phone-restrictions"
       | "sellers"
+      | "seller-reviews"
       | "seller-profits",
   );
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -561,6 +575,62 @@ export default function AdminDashboard() {
       return rows;
     },
   });
+
+  const { data: sellerReviewSummaries, isLoading: sellerReviewSummariesLoading, refetch: refetchSellerReviewSummaries } = useQuery({
+    queryKey: ['admin-seller-review-summaries'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('seller_review_summary' as any)
+        .select('seller_id, seller_name, seller_email, product_count, review_count, avg_rating, best_product_id, best_product_name, best_product_avg_rating, best_product_review_count');
+      if (error) throw error;
+      return (data || []) as SellerReviewSummaryRow[];
+    },
+  });
+
+  const renderStars = (value: number, size = 14) => {
+    const rounded = Math.round(value * 10) / 10;
+    const fullCount = Math.floor(rounded);
+    const hasHalf = rounded - fullCount >= 0.5;
+    return (
+      <div className="flex items-center gap-0.5">
+        {Array.from({ length: 5 }).map((_, i) => {
+          const idx = i + 1;
+          const isFull = idx <= fullCount;
+          const isHalf = !isFull && hasHalf && idx === fullCount + 1;
+          return (
+            <span key={idx} className="relative inline-flex" style={{ width: size, height: size }}>
+              <Star className="h-full w-full text-amber-400/40" />
+              {(isFull || isHalf) && (
+                <Star
+                  className="absolute inset-0 h-full w-full text-amber-400 fill-amber-400"
+                  style={isHalf ? ({ clipPath: 'inset(0 50% 0 0)' } as any) : undefined}
+                />
+              )}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const [sellerReviewSort, setSellerReviewSort] = useState<'most-reviews' | 'best-rated'>('most-reviews');
+  const sellerReviewRows = (sellerReviewSummaries || []).slice().sort((a, b) => {
+    if (sellerReviewSort === 'best-rated') {
+      if ((b.avg_rating || 0) !== (a.avg_rating || 0)) return (b.avg_rating || 0) - (a.avg_rating || 0);
+      return (b.review_count || 0) - (a.review_count || 0);
+    }
+    if ((b.review_count || 0) !== (a.review_count || 0)) return (b.review_count || 0) - (a.review_count || 0);
+    return (b.avg_rating || 0) - (a.avg_rating || 0);
+  });
+
+  const [sellerReviewSearch, setSellerReviewSearch] = useState('');
+  const [selectedSellerReviewId, setSelectedSellerReviewId] = useState<string | null>(null);
+  const filteredSellerReviewRows = sellerReviewRows.filter((r) => {
+    const q = sellerReviewSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (r.seller_name || '').toLowerCase().includes(q) || (r.seller_email || '').toLowerCase().includes(q);
+  });
+  const selectedSellerReviewRow = (sellerReviewRows || []).find((r) => r.seller_id === selectedSellerReviewId) || null;
 
   // Admin commission percentage (editable by admin in UI)
   const [adminPercent, setAdminPercent] = useState<number>(5);
@@ -1723,6 +1793,9 @@ export default function AdminDashboard() {
                     <Button variant={activeTab === "seller-profits" ? "royal" : "ghost"} className="justify-start" onClick={() => { setActiveTab("seller-profits"); setMobileMenuOpen(false); }}>
                       <DollarSign className="w-4 h-4 mr-2" /> Seller Profits
                     </Button>
+                  <Button variant={activeTab === "seller-reviews" ? "royal" : "ghost"} className="justify-start" onClick={() => { setActiveTab("seller-reviews"); setMobileMenuOpen(false); }}>
+                    <Star className="w-4 h-4 mr-2" /> Seller Reviews
+                  </Button>
 
                   </div>
                 </div>
@@ -1768,6 +1841,10 @@ export default function AdminDashboard() {
               <TabsTrigger value="seller-profits" className="flex items-center gap-2 whitespace-nowrap w-full justify-start sm:w-auto sm:justify-center">
                 <DollarSign className="w-4 h-4" />
                 Seller Profits
+              </TabsTrigger>
+              <TabsTrigger value="seller-reviews" className="flex items-center gap-2 whitespace-nowrap w-full justify-start sm:w-auto sm:justify-center">
+                <Star className="w-4 h-4" />
+                Seller Reviews
               </TabsTrigger>
 
             </TabsList>
@@ -3774,6 +3851,135 @@ export default function AdminDashboard() {
           {/* Sellers Tab */}
           <TabsContent value="sellers" className="space-y-6">
             <SellersManager />
+          </TabsContent>
+
+          <TabsContent value="seller-reviews" className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <h2 className="font-display text-2xl font-bold">Seller Reviews</h2>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" onClick={() => refetchSellerReviewSummaries()} title="Refresh">
+                  <RefreshCw className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            {sellerReviewSummariesLoading ? (
+              <div className="text-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+              </div>
+            ) : !sellerReviewRows || sellerReviewRows.length === 0 ? (
+              <div className="text-center py-12 bg-card rounded-xl border border-border/50">
+                <Star className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-muted-foreground">No seller review data available yet.</p>
+              </div>
+            ) : (
+              <>
+                <div className="bg-card rounded-xl border border-border/50 p-5">
+                  <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+                    <div className="flex-1 min-w-0">
+                      <Label>Search seller</Label>
+                      <Input
+                        value={sellerReviewSearch}
+                        onChange={(e) => setSellerReviewSearch(e.target.value)}
+                        placeholder="Type seller name (case-insensitive)"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <Label>Select seller</Label>
+                      <Select value={selectedSellerReviewId || ''} onValueChange={(v) => setSelectedSellerReviewId(v)}>
+                        <SelectTrigger className="w-full mt-1">
+                          <SelectValue placeholder="Select seller" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filteredSellerReviewRows.map((row) => (
+                            <SelectItem key={row.seller_id} value={row.seller_id}>
+                              {row.seller_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Select value={sellerReviewSort} onValueChange={(v) => setSellerReviewSort(v as any)}>
+                        <SelectTrigger className="w-[190px]">
+                          <SelectValue placeholder="Sort" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="most-reviews">Most reviews</SelectItem>
+                          <SelectItem value="best-rated">Best rated</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                {!selectedSellerReviewRow ? (
+                  <div className="text-center py-12 bg-card rounded-xl border border-border/50">
+                    <Star className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                    <p className="text-muted-foreground">Select a seller to see review analytics.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-card rounded-xl border border-border/50 p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-display text-lg font-bold truncate">{selectedSellerReviewRow.seller_name}</div>
+                          <div className="text-sm text-muted-foreground truncate">{selectedSellerReviewRow.seller_email}</div>
+                          <div className="mt-2 flex items-center gap-2">
+                            {renderStars(Number(selectedSellerReviewRow.avg_rating || 0), 14)}
+                            <span className="text-sm text-muted-foreground">{Number(selectedSellerReviewRow.avg_rating || 0).toFixed(1)}</span>
+                            <span className="text-sm text-muted-foreground">({selectedSellerReviewRow.review_count})</span>
+                          </div>
+                        </div>
+                        <div className="text-right text-sm">
+                          <div className="text-muted-foreground">Products</div>
+                          <div className="font-semibold">{selectedSellerReviewRow.product_count}</div>
+                        </div>
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-3">
+                        <div className="rounded-lg border border-border/50 bg-muted/10 p-3">
+                          <div className="text-xs text-muted-foreground">Total reviews</div>
+                          <div className="text-xl font-bold">{selectedSellerReviewRow.review_count}</div>
+                        </div>
+                        <div className="rounded-lg border border-border/50 bg-muted/10 p-3">
+                          <div className="text-xs text-muted-foreground">Average rating</div>
+                          <div className="text-xl font-bold">{Number(selectedSellerReviewRow.avg_rating || 0).toFixed(1)}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-card rounded-xl border border-border/50 p-5">
+                      <div className="font-medium">Best product</div>
+                      <div className="text-sm text-muted-foreground">Based on review count then rating</div>
+
+                      {selectedSellerReviewRow.best_product_name ? (
+                        <div className="mt-4 rounded-lg border border-border/50 bg-muted/20 p-4">
+                          <div className="font-medium truncate">{selectedSellerReviewRow.best_product_name}</div>
+                          <div className="mt-2 flex items-center gap-2">
+                            {renderStars(Number(selectedSellerReviewRow.best_product_avg_rating || 0), 14)}
+                            <span className="text-sm text-muted-foreground">{Number(selectedSellerReviewRow.best_product_avg_rating || 0).toFixed(1)}</span>
+                            <span className="text-sm text-muted-foreground">({Number(selectedSellerReviewRow.best_product_review_count || 0)})</span>
+                          </div>
+                          {selectedSellerReviewRow.best_product_id && (
+                            <Button
+                              variant="royalOutline"
+                              size="sm"
+                              className="mt-3"
+                              onClick={() => window.open(`/product/${selectedSellerReviewRow.best_product_id}`, '_blank')}
+                            >
+                              Open product
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="mt-4 text-muted-foreground">No products/reviews yet.</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </TabsContent>
 
           {/* Seller Profits Tab */}
