@@ -30,7 +30,7 @@ export default function ForgotPassword() {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("super-responder", {
-        body: { action: "request", email },
+        body: { action: "request", email: email.trim().toLowerCase() },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
