@@ -264,7 +264,7 @@ export default function Products() {
         </div>
 
           {/* Top Deals strip for collection page */}
-          <TopDeals />
+          <TopDeals containerClassName="px-0" />
 
         {/* Filter Menu */}
         <FilterMenu

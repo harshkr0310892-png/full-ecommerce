@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 function formatPrice(value: number | string | undefined) {
   const n = Number(value || 0);
@@ -18,6 +19,26 @@ export default function DealGrid({ section }: { section: any }) {
   const columns = layoutConfig.columns || 5;
   const rows = layoutConfig.rows || 2;
   const totalProducts = columns * rows;
+
+  const [viewportWidth, setViewportWidth] = useState(() => {
+    if (typeof window === 'undefined') return 1024;
+    return window.innerWidth;
+  });
+
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const effectiveColumns = useMemo(() => {
+    const clampToConfigured = (n: number) => Math.max(1, Math.min(n, columns));
+
+    if (viewportWidth < 640) return clampToConfigured(2);
+    if (viewportWidth < 768) return clampToConfigured(3);
+    if (viewportWidth < 1024) return clampToConfigured(4);
+    return clampToConfigured(columns);
+  }, [viewportWidth, columns]);
   
   const ids: string[] = Array.isArray(content?.product_ids) ? content.product_ids : [];
 
@@ -46,22 +67,20 @@ export default function DealGrid({ section }: { section: any }) {
     },
   });
 
-  useEffect(() => {
-    console.debug('DealGrid: products=', products);
-  }, [products]);
-
   if (isLoading) {
     return (
-      <section className="max-w-6xl mx-auto px-4 py-6">
-        <h3 className="font-display text-xl font-semibold mb-4">{section?.title || 'Deals'}</h3>
-        <div className="flex gap-3">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="w-32 flex-shrink-0 space-y-2">
-              <Skeleton className="w-full h-32 rounded-lg" />
-              <Skeleton className="h-3 w-3/4" />
-              <Skeleton className="h-3 w-1/2" />
-            </div>
-          ))}
+      <section className="py-6">
+        <div className="container mx-auto px-4">
+          <h3 className="font-display text-xl font-semibold mb-4">{section?.title || 'Deals'}</h3>
+          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${effectiveColumns}, minmax(0, 1fr))` }}>
+            {[...Array(Math.min(10, totalProducts))].map((_, i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="w-full h-40 rounded-lg" />
+                <Skeleton className="h-3 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            ))}
+          </div>
         </div>
       </section>
     );
@@ -70,37 +89,37 @@ export default function DealGrid({ section }: { section: any }) {
   if (!products || products.length === 0) return null;
 
   return (
-    <section className="max-w-6xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-display text-xl font-bold">{section?.title || 'Deals'}</h3>
-        <button className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700">
-          →
-        </button>
-      </div>
+    <section className="py-6">
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-display text-xl font-bold">{section?.title || 'Deals'}</h3>
+          <Link to="/products" className={cn("text-sm text-muted-foreground hover:text-primary transition-colors")}>View all</Link>
+        </div>
 
-      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
-        {products.slice(0, totalProducts).map((p: any) => (
-          <Link
-            key={p.id}
-            to={`/product/${p.id}`}
-            className="bg-white rounded-lg overflow-hidden border border-border/50 shadow-sm"
-          >
-            <div className="w-full h-40 bg-muted flex items-center justify-center p-3">
-              {p.image_url ? (
-                <img src={p.image_url} alt={p.name} className="max-h-full max-w-full object-contain" />
-              ) : (
-                <div className="text-xs text-muted-foreground">No Image</div>
-              )}
-            </div>
-            <div className="p-2">
-              <div className="text-xs font-medium line-clamp-2 mb-1">{p.name}</div>
-              <div className="text-xs text-muted-foreground">₹{formatPrice(p.price)}</div>
-              <div className="text-xs text-green-600 font-semibold mt-1">
-                {Number(p.discount_percentage || 0) > 0 ? `Min. ${p.discount_percentage}% Off` : 'Special offer'}
+        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${effectiveColumns}, minmax(0, 1fr))` }}>
+          {products.slice(0, totalProducts).map((p: any) => (
+            <Link
+              key={p.id}
+              to={`/product/${p.id}`}
+              className="bg-card rounded-lg overflow-hidden border border-border/50 shadow-sm"
+            >
+              <div className="w-full h-40 bg-muted flex items-center justify-center p-3">
+                {p.image_url ? (
+                  <img src={p.image_url} alt={p.name} className="max-h-full max-w-full object-contain" />
+                ) : (
+                  <div className="text-xs text-muted-foreground">No Image</div>
+                )}
               </div>
-            </div>
-          </Link>
-        ))}
+              <div className="p-2">
+                <div className="text-xs font-medium line-clamp-2 mb-1 text-foreground">{p.name}</div>
+                <div className="text-xs text-muted-foreground">₹{formatPrice(p.price)}</div>
+                <div className="text-xs text-green-600 font-semibold mt-1">
+                  {Number(p.discount_percentage || 0) > 0 ? `Min. ${p.discount_percentage}% Off` : 'Special offer'}
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
       </div>
     </section>
   );

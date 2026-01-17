@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { 
   Crown, Home, Loader2, User, Phone, MapPin, Package, 
   Clock, CheckCircle, Truck, XCircle, LogOut, Camera,
-  Edit2, Save, X, ChevronDown, ChevronUp, Sparkles, Shield, Star
+  Edit2, Save, X, ChevronDown, ChevronUp, Sparkles, Shield, Star, Heart, Copy
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -414,6 +414,32 @@ export default function CustomerProfile() {
   useEffect(() => {
     checkAuthAndLoadData();
   }, []);
+
+  const copyOrderId = async (orderId: string) => {
+    const value = orderId.trim();
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success('Order ID copied');
+    } catch {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = value;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        textarea.style.top = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (ok) toast.success('Order ID copied');
+        else toast.error('Failed to copy');
+      } catch {
+        toast.error('Failed to copy');
+      }
+    }
+  };
 
   const checkAuthAndLoadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -1077,6 +1103,24 @@ export default function CustomerProfile() {
                     </button>
                     <button
                       className={cn(
+                        "nav-tab w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 text-gray-300 font-medium"
+                      )}
+                      onClick={() => navigate('/wishlist')}
+                    >
+                      <Heart className="w-5 h-5" />
+                      <span>Wishlist</span>
+                    </button>
+                    <button
+                      className={cn(
+                        "nav-tab w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 text-gray-300 font-medium"
+                      )}
+                      onClick={() => navigate('/track-order')}
+                    >
+                      <Truck className="w-5 h-5" />
+                      <span>Track Order</span>
+                    </button>
+                    <button
+                      className={cn(
                         "nav-tab w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 text-gray-300 font-medium",
                         activeTab === 'chatbot' && 'active text-amber-400'
                       )}
@@ -1142,9 +1186,19 @@ export default function CustomerProfile() {
                                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                                   <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-3 mb-2">
-                                      <span className="gold-text font-semibold text-lg">
-                                        {order.order_id}
-                                      </span>
+                                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                        <span className="gold-text font-semibold text-lg">
+                                          {order.order_id}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          className="text-amber-400/60 hover:text-amber-400 transition-colors p-1.5 rounded-md hover:bg-amber-400/10"
+                                          onClick={() => copyOrderId(order.order_id)}
+                                          aria-label="Copy order id"
+                                        >
+                                          <Copy className="w-4 h-4" />
+                                        </button>
+                                      </div>
                                       <span className={`status-badge ${status.className}`}>
                                         {status.icon}
                                         {status.label}

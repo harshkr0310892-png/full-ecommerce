@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Search, Crown, Package, Truck, CheckCircle, Clock, Loader2, XCircle, MessageCircle, FileText, Download, AlertCircle } from "lucide-react";
 import { cn, normalizeIndianMobile } from "@/lib/utils";
+import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 
 import {
   Dialog,
@@ -67,6 +69,9 @@ const statusSteps = [
 ];
 
 export default function TrackOrder() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isLoggedIn, loading } = useCustomerAuth();
   const [searchId, setSearchId] = useState('');
   const [searchType, setSearchType] = useState<'order-id' | 'phone'>('order-id');
   const [isLoading, setIsLoading] = useState(false);
@@ -78,6 +83,14 @@ export default function TrackOrder() {
   const [cancelOrderId, setCancelOrderId] = useState('');
   const [cancelling, setCancelling] = useState(false);
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
+
+  useEffect(() => {
+    if (loading) return;
+    if (isLoggedIn) return;
+
+    const redirectTo = `${location.pathname}${location.search}`;
+    navigate(`/auth?redirect=${encodeURIComponent(redirectTo)}`, { replace: true });
+  }, [isLoggedIn, loading, location.pathname, location.search, navigate]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Scroll messages to bottom
@@ -499,6 +512,20 @@ export default function TrackOrder() {
   };
 
   const currentStep = getCurrentStep();
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-20 text-center">
+          <div className="text-muted-foreground">Loading...</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return null;
+  }
 
   return (
     <div className="warm-bg min-h-screen">

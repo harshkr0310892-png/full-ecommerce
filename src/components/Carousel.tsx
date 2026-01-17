@@ -28,31 +28,31 @@ const DEFAULT_ITEMS: CarouselItem[] = [
     title: 'Lightning Fast Delivery',
     description: 'Get your orders delivered within 2-3 business days. Free shipping on orders above ₹499.',
     id: 1,
-    icon: <Truck className="h-[16px] w-[16px] text-white" />
+    icon: <Truck className="h-[20px] w-[20px] text-white" />
   },
   {
     title: '100% Secure Payments',
     description: 'Your payment information is processed securely. We support all major payment methods.',
     id: 2,
-    icon: <Shield className="h-[16px] w-[16px] text-white" />
+    icon: <Shield className="h-[20px] w-[20px] text-white" />
   },
   {
     title: 'Easy Returns',
     description: '7-day hassle-free returns. No questions asked. Full refund guaranteed.',
     id: 3,
-    icon: <RefreshCw className="h-[16px] w-[16px] text-white" />
+    icon: <RefreshCw className="h-[20px] w-[20px] text-white" />
   },
   {
     title: '24/7 Premium Support',
     description: 'Our dedicated support team is here to help you anytime via chat, email, or phone.',
     id: 4,
-    icon: <Headphones className="h-[16px] w-[16px] text-white" />
+    icon: <Headphones className="h-[20px] w-[20px] text-white" />
   },
   {
     title: 'Trusted Service',
     description: 'Join thousands of satisfied customers who trust our service.',
     id: 5,
-    icon: <Star className="h-[16px] w-[16px] text-white" />
+    icon: <Star className="h-[20px] w-[20px] text-white" />
   }
 ];
 
@@ -93,7 +93,7 @@ function CarouselItem({ item, index, itemWidth, round, trackItemOffset, x, trans
       transition={transition}
     >
       <div className={`${round ? 'p-0 m-0' : 'mb-4 p-5'}`}>
-        <span className="flex h-[28px] w-[28px] items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-purple-500">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-purple-500">
           {item.icon}
         </span>
       </div>

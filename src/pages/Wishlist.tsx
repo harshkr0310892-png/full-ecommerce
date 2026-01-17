@@ -1,4 +1,4 @@
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { SearchBar } from "@/components/SearchBar";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { useCartStore } from "@/store/cartStore";
 import { toast } from "sonner";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 
 export default function Wishlist() {
   const { items, removeItem, clearNewItemFlag } = useWishlistStore();
@@ -16,9 +17,20 @@ export default function Wishlist() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const newItemRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isLoggedIn, loading } = useCustomerAuth();
   
   // Items per page - 8 items per page
   const itemsPerPage = 8;
+
+  useEffect(() => {
+    if (loading) return;
+    if (isLoggedIn) return;
+
+    const redirectTo = `${location.pathname}${location.search}`;
+    navigate(`/auth?redirect=${encodeURIComponent(redirectTo)}`, { replace: true });
+  }, [isLoggedIn, loading, location.pathname, location.search, navigate]);
   
   // Get current page from URL params or default to 1
   useEffect(() => {
@@ -84,6 +96,20 @@ export default function Wishlist() {
   const discountedPrice = (price: number, discount_percentage: number) => {
     return price * (1 - discount_percentage / 100);
   };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-20 text-center">
+          <div className="text-muted-foreground">Loading...</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return null;
+  }
 
   if (items.length === 0) {
     return (

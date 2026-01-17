@@ -500,7 +500,7 @@ export default function Index() {
                 items={((featuresSection?.content as any)?.features || defaultFeatures).map((feature: any, index: number) => ({
                   ...feature,
                   id: index + 1,
-                  icon: React.createElement(feature.icon || Award, { className: "h-[16px] w-[16px] text-primary-foreground" })
+                  icon: React.createElement(feature.icon || Award, { className: "h-[20px] w-[20px] text-primary-foreground" })
                 }))}
                 baseWidth={300}
                 loop={true}
