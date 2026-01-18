@@ -1,4 +1,4 @@
-import { useParams, Link, useLocation } from "react-router-dom";
+import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -27,6 +27,7 @@ interface SelectedVariant {
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedVariant, setSelectedVariant] = useState<SelectedVariant | null>(null);
@@ -53,6 +54,9 @@ export default function ProductDetail() {
   const { addItem: addToWishlist, isInWishlist, removeItem: removeFromWishlist, clearNewItemFlag } = useWishlistStore();
   
   const isWishlisted = isInWishlist(id || "");
+  const urlParams = useRef<URLSearchParams | null>(null);
+  urlParams.current = new URLSearchParams(location.search);
+  const initialVariantId = (urlParams.current.get("variant") || urlParams.current.get("variantId") || "").trim() || null;
 
   // Clear animation flag after initial render
   useEffect(() => {
@@ -1280,6 +1284,11 @@ export default function ProductDetail() {
                 productId={product.id}
                 basePrice={Number(product.price)}
                 onVariantChange={handleVariantChange}
+                initialVariantId={initialVariantId}
+                onInvalidInitialVariant={() => {
+                  toast.error("This option is unavailable now.");
+                  navigate(`/product/${product.id}`, { replace: true });
+                }}
               />
             </div>
 

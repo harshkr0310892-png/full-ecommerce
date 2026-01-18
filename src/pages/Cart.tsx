@@ -6,6 +6,7 @@ import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, Crown } from "lucide-reac
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useEffect, useMemo, useState } from "react";
 
 export default function Cart() {
   const navigate = useNavigate();
@@ -13,6 +14,92 @@ export default function Cart() {
   const total = getTotal();
   const discountedTotal = getDiscountedTotal();
   const savings = total - discountedTotal;
+  const [variantImages, setVariantImages] = useState<Record<string, string[]>>({});
+
+  const variantIds = useMemo(() => {
+    const ids = items
+      .map((i) => (i as any)?.variant_info?.variant_id as string | undefined)
+      .filter(Boolean) as string[];
+    return Array.from(new Set(ids));
+  }, [items]);
+
+  const productIds = useMemo(() => {
+    const ids = items
+      .map((i) => (i as any)?.product_id || (typeof i.id === "string" ? i.id.split("#")[0] : null))
+      .filter(Boolean) as string[];
+    return Array.from(new Set(ids));
+  }, [items]);
+
+  useEffect(() => {
+    if (productIds.length === 0) {
+      return;
+    }
+    let active = true;
+    (async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id,stock_status")
+        .in("id", productIds);
+      if (!active) return;
+      if (error) return;
+      const map: Record<string, true> = {};
+      const found = new Set((data || []).map((p: any) => p.id));
+      productIds.forEach((pid) => {
+        if (!found.has(pid)) map[pid] = true;
+      });
+      (data || []).forEach((p: any) => {
+        const s = (p.stock_status || "").toString().toLowerCase();
+        if (["deleted", "inactive", "unavailable"].includes(s)) map[p.id] = true;
+      });
+
+      const toRemove = items.filter((it: any) => map[(it.product_id || it.id.split("#")[0]) as string]);
+      if (toRemove.length > 0) {
+        toRemove.forEach((it: any) => removeItem(it.id));
+        toast.error("Some items were removed because the product is unavailable.");
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [items, productIds, removeItem]);
+
+  useEffect(() => {
+    if (variantIds.length === 0) {
+      setVariantImages({});
+      return;
+    }
+    let active = true;
+    (async () => {
+      const { data, error } = await supabase
+        .from("product_variants" as any)
+        .select("id,image_urls,is_available")
+        .in("id", variantIds);
+      if (!active) return;
+      if (error) return;
+      const map: Record<string, string[]> = {};
+      const found = new Set((data || []).map((v: any) => v.id));
+      (data || []).forEach((v: any) => {
+        map[v.id] = Array.isArray(v.image_urls) ? v.image_urls : [];
+      });
+      setVariantImages(map);
+
+      const removedLines = items.filter((it: any) => {
+        const vid = it?.variant_info?.variant_id;
+        if (!vid) return false;
+        if (!found.has(vid)) return true;
+        const v = (data || []).find((x: any) => x.id === vid);
+        if (v && v.is_available === false) return true;
+        return false;
+      });
+      if (removedLines.length > 0) {
+        removedLines.forEach((it: any) => removeItem(it.id));
+        toast.error("Some items were removed because the option is unavailable.");
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [items, removeItem, variantIds]);
 
   const handleCheckout = async () => {
     // Check if user is authenticated
@@ -63,6 +150,9 @@ export default function Cart() {
           <div className="lg:col-span-2 space-y-4">
             {items.map((item, index) => {
               const discountedPrice = item.price * (1 - item.discount_percentage / 100);
+              const variantId = (item as any)?.variant_info?.variant_id as string | undefined;
+              const variantImage = variantId ? variantImages[variantId]?.[0] : undefined;
+              const imageUrl = variantImage || item.image_url;
               
               return (
                 <div 
@@ -75,9 +165,9 @@ export default function Cart() {
                 >
                   {/* Image */}
                   <div className="w-24 h-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                    {item.image_url ? (
+                    {imageUrl ? (
                       <img 
-                        src={item.image_url} 
+                        src={imageUrl} 
                         alt={item.name}
                         className="w-full h-full object-cover"
                       />
@@ -96,6 +186,12 @@ export default function Cart() {
                     >
                       {item.name}
                     </Link>
+                    {(item as any)?.variant_info?.attribute_name && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {(item as any).variant_info.attribute_name}:{" "}
+                        {((item as any).variant_info.value_name ?? (item as any).variant_info.attribute_value) as any}
+                      </div>
+                    )}
                     
                     <div className="flex items-center gap-2 mt-1">
                       {item.discount_percentage > 0 ? (

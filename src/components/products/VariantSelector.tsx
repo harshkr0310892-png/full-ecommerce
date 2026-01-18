@@ -36,9 +36,11 @@ interface VariantSelectorProps {
   productId: string;
   basePrice: number;
   onVariantChange: (variant: ProductVariant | null, attributeName: string, valueName: string) => void;
+  initialVariantId?: string | null;
+  onInvalidInitialVariant?: () => void;
 }
 
-export function VariantSelector({ productId, basePrice, onVariantChange }: VariantSelectorProps) {
+export function VariantSelector({ productId, basePrice, onVariantChange, initialVariantId, onInvalidInitialVariant }: VariantSelectorProps) {
   // selectedAttributes: map of attribute_id -> attribute_value_id
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
   const [openAttributes, setOpenAttributes] = useState<Record<string, boolean>>({});
@@ -126,6 +128,24 @@ export function VariantSelector({ productId, basePrice, onVariantChange }: Varia
         values: Array.from(attr.values.values()) // Convert values map to array
       }));
   }, [variants]);
+
+  useEffect(() => {
+    if (!variants || variants.length === 0) return;
+    if (!initialVariantId) return;
+    if (Object.keys(selectedAttributes).length > 0) return;
+
+    const v = variants.find((x) => x.id === initialVariantId);
+    if (!v) {
+      onInvalidInitialVariant?.();
+      return;
+    }
+
+    const selection: Record<string, string> = {};
+    v.product_variant_values.forEach((pvv) => {
+      selection[pvv.product_attribute_values.attribute_id] = pvv.product_attribute_values.id;
+    });
+    setSelectedAttributes(selection);
+  }, [initialVariantId, onInvalidInitialVariant, selectedAttributes, variants]);
 
   useEffect(() => {
     if (productAttributes.length === 0) return;

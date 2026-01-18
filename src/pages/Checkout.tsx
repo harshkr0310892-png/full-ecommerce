@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,7 @@ interface AppliedCoupon {
 
 export default function Checkout() {
   const navigate = useNavigate();
-  const { items, getDiscountedTotal, clearCart } = useCartStore();
+  const { items, getDiscountedTotal, clearCart, removeItem } = useCartStore();
   const [isLoading, setIsLoading] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [orderId, setOrderId] = useState('');
@@ -53,6 +53,106 @@ export default function Checkout() {
   const [agreePolicies, setAgreePolicies] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('online');
   const [clientIP, setClientIP] = useState<string>('');
+  const [variantImages, setVariantImages] = useState<Record<string, string[]>>({});
+
+  const variantIds = useMemo(() => {
+    const ids = items
+      .map((i) => (i as any)?.variant_info?.variant_id as string | undefined)
+      .filter(Boolean) as string[];
+    return Array.from(new Set(ids));
+  }, [items]);
+
+  const productIds = useMemo(() => {
+    const ids = items
+      .map((i) => (i as any)?.product_id || (typeof i.id === "string" ? i.id.split("#")[0] : null))
+      .filter(Boolean) as string[];
+    return Array.from(new Set(ids));
+  }, [items]);
+
+  useEffect(() => {
+    if (productIds.length === 0) return;
+    let active = true;
+    (async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id,stock_status,stock_quantity")
+        .in("id", productIds);
+      if (!active) return;
+      if (error) return;
+      const found = new Set((data || []).map((p: any) => p.id));
+      const unavailable = new Set<string>();
+      productIds.forEach((pid) => {
+        if (!found.has(pid)) unavailable.add(pid);
+      });
+      (data || []).forEach((p: any) => {
+        const s = (p.stock_status || "").toString().toLowerCase();
+        if (["deleted", "inactive", "unavailable", "sold_out", "out_of_stock"].includes(s)) unavailable.add(p.id);
+      });
+      const toRemove = items.filter((it: any) => unavailable.has((it.product_id || it.id.split("#")[0]) as string));
+      if (toRemove.length > 0) {
+        toRemove.forEach((it: any) => removeItem(it.id));
+        toast.error("Some cart items were removed because the product is unavailable.");
+      }
+
+      const productMap = new Map<string, any>((data || []).map((p: any) => [p.id, p]));
+      const insufficient = items.filter((it: any) => {
+        const productId = (it.product_id || it.id.split("#")[0]) as string;
+        const p = productMap.get(productId);
+        if (!p) return false;
+        if (it?.variant_info?.variant_id) return false;
+        const stockQty = p.stock_quantity === null || p.stock_quantity === undefined ? null : Number(p.stock_quantity);
+        if (stockQty === null) return false;
+        return stockQty < Number(it.quantity || 0) || stockQty <= 0;
+      });
+      if (insufficient.length > 0) {
+        insufficient.forEach((it: any) => removeItem(it.id));
+        toast.error("You're too late — some items are now out of stock.");
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [items, productIds, removeItem]);
+
+  useEffect(() => {
+    if (variantIds.length === 0) {
+      setVariantImages({});
+      return;
+    }
+    let active = true;
+    (async () => {
+      const { data, error } = await supabase
+        .from("product_variants" as any)
+        .select("id,image_urls,is_available,stock_quantity")
+        .in("id", variantIds);
+      if (!active) return;
+      if (error) return;
+      const map: Record<string, string[]> = {};
+      const found = new Set((data || []).map((v: any) => v.id));
+      (data || []).forEach((v: any) => {
+        map[v.id] = Array.isArray(v.image_urls) ? v.image_urls : [];
+      });
+      setVariantImages(map);
+
+      const removedLines = items.filter((it: any) => {
+        const vid = it?.variant_info?.variant_id;
+        if (!vid) return false;
+        if (!found.has(vid)) return true;
+        const v = (data || []).find((x: any) => x.id === vid);
+        if (v && v.is_available === false) return true;
+        const stockQty = v?.stock_quantity === null || v?.stock_quantity === undefined ? null : Number(v.stock_quantity);
+        if (stockQty !== null && (stockQty <= 0 || stockQty < Number(it.quantity || 0))) return true;
+        return false;
+      });
+      if (removedLines.length > 0) {
+        removedLines.forEach((it: any) => removeItem(it.id));
+        toast.error("You're too late — some options are now out of stock.");
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [items, removeItem, variantIds]);
 
   // 3-step checkout
   const [checkoutStep, setCheckoutStep] = useState<1 | 2 | 3>(1);
@@ -436,6 +536,96 @@ export default function Checkout() {
     const codEligible = items.every((it) => it.cash_on_delivery === true);
     if (paymentMethod === 'cod' && !codEligible) {
       toast.error('Cash on Delivery is not available for some items in your cart.');
+      return;
+    }
+
+    const validateStockBeforeOrder = async () => {
+      const productIds = Array.from(
+        new Set(
+          items
+            .map((i: any) => i.product_id || (typeof i.id === "string" ? i.id.split("#")[0] : null))
+            .filter(Boolean) as string[]
+        )
+      );
+      const variantIds = Array.from(
+        new Set(
+          items
+            .map((i: any) => i?.variant_info?.variant_id)
+            .filter(Boolean) as string[]
+        )
+      );
+
+      if (productIds.length > 0) {
+        const { data: productsData, error: productsError } = await supabase
+          .from("products")
+          .select("id,stock_status,stock_quantity")
+          .in("id", productIds);
+        if (productsError) throw productsError;
+        const found = new Set((productsData || []).map((p: any) => p.id));
+        const unavailable = new Set<string>();
+        productIds.forEach((pid) => {
+          if (!found.has(pid)) unavailable.add(pid);
+        });
+        (productsData || []).forEach((p: any) => {
+          const s = (p.stock_status || "").toString().toLowerCase();
+          if (["deleted", "inactive", "unavailable", "sold_out", "out_of_stock"].includes(s)) unavailable.add(p.id);
+        });
+        const toRemove = items.filter((it: any) => unavailable.has((it.product_id || it.id.split("#")[0]) as string));
+        if (toRemove.length > 0) {
+          toRemove.forEach((it: any) => removeItem(it.id));
+          toast.error("Some cart items are unavailable and were removed.");
+          return false;
+        }
+
+        const productMap = new Map<string, any>((productsData || []).map((p: any) => [p.id, p]));
+        const insufficient = items.filter((it: any) => {
+          const productId = (it.product_id || it.id.split("#")[0]) as string;
+          const p = productMap.get(productId);
+          if (!p) return false;
+          if (it?.variant_info?.variant_id) return false;
+          const stockQty = p.stock_quantity === null || p.stock_quantity === undefined ? null : Number(p.stock_quantity);
+          if (stockQty === null) return false;
+          return stockQty <= 0 || stockQty < Number(it.quantity || 0);
+        });
+        if (insufficient.length > 0) {
+          insufficient.forEach((it: any) => removeItem(it.id));
+          toast.error("You're too late — some items are now out of stock.");
+          return false;
+        }
+      }
+
+      if (variantIds.length > 0) {
+        const { data: variantsData, error: variantsError } = await supabase
+          .from("product_variants" as any)
+          .select("id,is_available,stock_quantity")
+          .in("id", variantIds);
+        if (variantsError) throw variantsError;
+        const found = new Set((variantsData || []).map((v: any) => v.id));
+        const invalid = items.filter((it: any) => {
+          const vid = it?.variant_info?.variant_id;
+          if (!vid) return false;
+          if (!found.has(vid)) return true;
+          const v = (variantsData || []).find((x: any) => x.id === vid);
+          if (v && v.is_available === false) return true;
+          const stockQty = v?.stock_quantity === null || v?.stock_quantity === undefined ? null : Number(v.stock_quantity);
+          if (stockQty !== null && (stockQty <= 0 || stockQty < Number(it.quantity || 0))) return true;
+          return false;
+        });
+        if (invalid.length > 0) {
+          invalid.forEach((it: any) => removeItem(it.id));
+          toast.error("You're too late — some options are now out of stock.");
+          return false;
+        }
+      }
+
+      return true;
+    };
+
+    try {
+      const ok = await validateStockBeforeOrder();
+      if (!ok) return;
+    } catch {
+      toast.error("Unable to verify stock right now. Please try again.");
       return;
     }
 
@@ -1005,12 +1195,15 @@ export default function Checkout() {
               <div className="space-y-3 max-h-64 overflow-y-auto checkout-summary-items">
                 {items.map((item) => {
                   const discountedPrice = item.price * (1 - item.discount_percentage / 100);
+                  const variantId = (item as any)?.variant_info?.variant_id as string | undefined;
+                  const variantImage = variantId ? variantImages[variantId]?.[0] : undefined;
+                  const imageUrl = variantImage || item.image_url;
                   return (
                     <div key={item.id} className="flex gap-2 md:gap-3 checkout-summary-item">
                       <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 checkout-summary-item-image">
-                        {item.image_url ? (
+                        {imageUrl ? (
                           <img
-                            src={item.image_url}
+                            src={imageUrl}
                             alt={item.name}
                             className="w-full h-full object-cover"
                           />
@@ -1022,6 +1215,12 @@ export default function Checkout() {
                       </div>
                       <div className="flex-1 min-w-0 checkout-summary-item-details">
                         <p className="font-medium line-clamp-1 text-xs sm:text-sm md:text-base checkout-summary-item-name">{item.name}</p>
+                        {(item as any)?.variant_info?.attribute_name && (
+                          <p className="text-xs text-muted-foreground">
+                            {(item as any).variant_info.attribute_name}:{" "}
+                            {((item as any).variant_info.value_name ?? (item as any).variant_info.attribute_value) as any}
+                          </p>
+                        )}
                         <p className="text-xs sm:text-sm text-muted-foreground checkout-summary-item-qty">
                           Qty: {item.quantity} × ₹{discountedPrice.toFixed(2)}
                         </p>

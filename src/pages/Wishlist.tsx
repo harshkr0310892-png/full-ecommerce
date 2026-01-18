@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useCustomerAuth } from "@/hooks/useCustomerAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Wishlist() {
   const { items, removeItem, clearNewItemFlag } = useWishlistStore();
@@ -17,6 +18,7 @@ export default function Wishlist() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const newItemRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
+  const [unavailable, setUnavailable] = useState<Record<string, { product: boolean; option: boolean }>>({});
   const navigate = useNavigate();
   const location = useLocation();
   const { isLoggedIn, loading } = useCustomerAuth();
@@ -63,6 +65,68 @@ export default function Wishlist() {
     );
   }, [items, searchTerm]);
 
+  useEffect(() => {
+    if (items.length === 0) {
+      setUnavailable({});
+      return;
+    }
+    let active = true;
+    (async () => {
+      const productIds = Array.from(new Set(items.map((i) => i.id)));
+      const variantIds = Array.from(
+        new Set(
+          items
+            .map((i) => i.variant_info?.variant_id)
+            .filter(Boolean) as string[]
+        )
+      );
+
+      const next: Record<string, { product: boolean; option: boolean }> = {};
+
+      const { data: productsData, error: productsError } = await supabase
+        .from("products")
+        .select("id,stock_status")
+        .in("id", productIds);
+      if (!active) return;
+      if (!productsError) {
+        const found = new Set((productsData || []).map((p: any) => p.id));
+        productIds.forEach((pid) => {
+          if (!found.has(pid)) next[pid] = { product: true, option: false };
+        });
+        (productsData || []).forEach((p: any) => {
+          const s = (p.stock_status || "").toString().toLowerCase();
+          if (["deleted", "inactive", "unavailable"].includes(s)) next[p.id] = { product: true, option: false };
+        });
+      }
+
+      if (variantIds.length > 0) {
+        const { data: variantsData, error: variantsError } = await supabase
+          .from("product_variants" as any)
+          .select("id,is_available")
+          .in("id", variantIds);
+        if (!active) return;
+        if (!variantsError) {
+          const found = new Set((variantsData || []).map((v: any) => v.id));
+          items.forEach((it) => {
+            const vid = it.variant_info?.variant_id;
+            if (!vid) return;
+            if (!found.has(vid)) {
+              next[it.id] = { product: next[it.id]?.product ?? false, option: true };
+              return;
+            }
+            const v = (variantsData || []).find((x: any) => x.id === vid);
+            if (v && v.is_available === false) next[it.id] = { product: next[it.id]?.product ?? false, option: true };
+          });
+        }
+      }
+
+      setUnavailable(next);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [items]);
+
   // Calculate pagination
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -89,6 +153,15 @@ export default function Wishlist() {
   };
 
   const handleAddToCart = (item: any) => {
+    const u = unavailable[item.id];
+    if (u?.product) {
+      toast.error("This product is unavailable.");
+      return;
+    }
+    if (u?.option) {
+      toast.error("This option is unavailable.");
+      return;
+    }
     addItemToCart(item);
     toast.success(`${item.name} added to cart!`);
   };
@@ -147,6 +220,9 @@ export default function Wishlist() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {currentItems.map((item) => {
             const finalPrice = discountedPrice(item.price, item.discount_percentage);
+            const isProductUnavailable = !!unavailable[item.id]?.product;
+            const isOptionUnavailable = !!unavailable[item.id]?.option;
+            const isUnavailable = isProductUnavailable || isOptionUnavailable;
             
             return (
               <div 
@@ -158,17 +234,22 @@ export default function Wishlist() {
                 )}
               >
                 <div className="relative aspect-video overflow-hidden">
-                  {item.image_url ? (
-                    <img 
-                      src={item.image_url} 
-                      alt={item.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-secondary">
-                      <Crown className="w-8 h-8 text-muted-foreground/50" />
-                    </div>
-                  )}
+                  <Link
+                    to={`/product/${item.id}${item.variant_info?.variant_id ? `?variant=${encodeURIComponent(item.variant_info.variant_id)}` : ''}`}
+                    className="block w-full h-full"
+                  >
+                    {item.image_url ? (
+                      <img 
+                        src={item.image_url} 
+                        alt={item.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-secondary">
+                        <Crown className="w-8 h-8 text-muted-foreground/50" />
+                      </div>
+                    )}
+                  </Link>
                   
                   {/* Badges */}
                   <div className="absolute top-2 left-2 flex flex-col gap-1">
@@ -190,12 +271,24 @@ export default function Wishlist() {
                 
                 {/* Content */}
                 <div className="p-3">
-                  <h3 className="font-display text-sm font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
-                    {item.name}
-                  </h3>
+                  <Link
+                    to={`/product/${item.id}${item.variant_info?.variant_id ? `?variant=${encodeURIComponent(item.variant_info.variant_id)}` : ''}`}
+                    className="block"
+                  >
+                    <h3 className="font-display text-sm font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+                      {item.name}
+                    </h3>
+                  </Link>
                   {item.variant_info?.attribute_name && item.variant_info?.attribute_value && (
                     <div className="mt-1 text-xs text-muted-foreground">
                       {item.variant_info.attribute_name}: {item.variant_info.attribute_value}
+                    </div>
+                  )}
+                  {isUnavailable && (
+                    <div className="mt-1 text-xs text-destructive">
+                      {isProductUnavailable
+                        ? "This product is unavailable."
+                        : "This option is unavailable."}
                     </div>
                   )}
                   
@@ -231,6 +324,7 @@ export default function Wishlist() {
                       variant="royal" 
                       className="flex-1 h-12 text-sm px-2"
                       onClick={() => handleAddToCart(item)}
+                      disabled={isUnavailable}
                     >
                       <ShoppingCart className="w-4 h-4 mr-1" />
                       Add

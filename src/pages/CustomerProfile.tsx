@@ -372,7 +372,13 @@ interface Order {
   return_request_date?: string | null;
   return_processed_date?: string | null;
   return_refund_amount?: number | null;
-  items?: { product_name: string; quantity: number; product_price: number; product_image?: string }[];
+  items?: {
+    product_name: string;
+    quantity: number;
+    product_price: number;
+    product_image?: string;
+    variant_info?: any;
+  }[];
   messages?: {
     id: string;
     message: string;
@@ -522,24 +528,47 @@ export default function CustomerProfile() {
     const ordersWithDetails = await Promise.all(
       (data || []).map(async (order) => {
         const { data: items } = await supabase
-          .from('order_items')
-          .select('product_name, quantity, product_price, product_id')
-          .eq('order_id', order.id);
-        
-        const itemsWithImages = await Promise.all(
-          (items || []).map(async (item) => {
-            const { data: product } = await supabase
-              .from('products')
-              .select('image_url')
-              .eq('id', item.product_id)
-              .single();
-            
-            return {
-              ...item,
-              product_image: product?.image_url
-            };
-          })
+          .from("order_items")
+          .select("product_name, quantity, product_price, product_id, variant_info")
+          .eq("order_id", order.id);
+
+        const productIds = Array.from(new Set((items || []).map((i: any) => i.product_id).filter(Boolean)));
+        const variantIds = Array.from(
+          new Set((items || []).map((i: any) => i?.variant_info?.variant_id as string | undefined).filter(Boolean))
         );
+
+        const productsMap: Record<string, any> = {};
+        if (productIds.length > 0) {
+          const { data: productsData } = await supabase
+            .from("products")
+            .select("id,image_url,images")
+            .in("id", productIds);
+          (productsData || []).forEach((p: any) => {
+            productsMap[p.id] = p;
+          });
+        }
+
+        const variantsMap: Record<string, string[]> = {};
+        if (variantIds.length > 0) {
+          const { data: variantsData } = await supabase
+            .from("product_variants" as any)
+            .select("id,image_urls")
+            .in("id", variantIds);
+          (variantsData || []).forEach((v: any) => {
+            variantsMap[v.id] = Array.isArray(v.image_urls) ? v.image_urls : [];
+          });
+        }
+
+        const itemsWithImages = (items || []).map((item: any) => {
+          const variantId = item?.variant_info?.variant_id as string | undefined;
+          const variantImage = variantId ? variantsMap[variantId]?.[0] : undefined;
+          const product = productsMap[item.product_id];
+          const productImage = product?.images?.[0] || product?.image_url;
+          return {
+            ...item,
+            product_image: variantImage || productImage,
+          };
+        });
         
         const { data: messages } = await supabase
           .from('order_messages')
@@ -1293,6 +1322,12 @@ export default function CustomerProfile() {
                                             )}
                                             <div className="min-w-0 flex-1">
                                               <p className="text-gray-200 font-medium truncate">{item.product_name}</p>
+                                              {item.variant_info?.attribute_name && (
+                                                <p className="text-gray-400 text-xs">
+                                                  {item.variant_info.attribute_name}:{" "}
+                                                  {(item.variant_info.value_name ?? item.variant_info.attribute_value) as any}
+                                                </p>
+                                              )}
                                               <p className="text-gray-400 text-xs">Qty: {item.quantity}</p>
                                             </div>
                                             <div className="text-amber-400/80 font-medium">
@@ -1359,6 +1394,12 @@ export default function CustomerProfile() {
                                             )}
                                             <div className="flex-1">
                                               <p className="text-gray-200 text-sm font-medium">{item.product_name}</p>
+                                              {item.variant_info?.attribute_name && (
+                                                <p className="text-gray-400 text-xs">
+                                                  {item.variant_info.attribute_name}:{" "}
+                                                  {(item.variant_info.value_name ?? item.variant_info.attribute_value) as any}
+                                                </p>
+                                              )}
                                               <p className="text-gray-400 text-xs">Qty: {item.quantity}</p>
                                             </div>
                                             <div className="text-amber-400/80 text-sm">
