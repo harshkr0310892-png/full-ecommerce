@@ -44,6 +44,7 @@ export function VariantSelector({ productId, basePrice, onVariantChange, initial
   // selectedAttributes: map of attribute_id -> attribute_value_id
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
   const [openAttributes, setOpenAttributes] = useState<Record<string, boolean>>({});
+  const [didApplyInitialVariant, setDidApplyInitialVariant] = useState(false);
 
   // Fetch variants with all nested attribute data
   const { data: variants, isLoading } = useQuery({
@@ -130,24 +131,6 @@ export function VariantSelector({ productId, basePrice, onVariantChange, initial
   }, [variants]);
 
   useEffect(() => {
-    if (!variants || variants.length === 0) return;
-    if (!initialVariantId) return;
-    if (Object.keys(selectedAttributes).length > 0) return;
-
-    const v = variants.find((x) => x.id === initialVariantId);
-    if (!v) {
-      onInvalidInitialVariant?.();
-      return;
-    }
-
-    const selection: Record<string, string> = {};
-    v.product_variant_values.forEach((pvv) => {
-      selection[pvv.product_attribute_values.attribute_id] = pvv.product_attribute_values.id;
-    });
-    setSelectedAttributes(selection);
-  }, [initialVariantId, onInvalidInitialVariant, selectedAttributes, variants]);
-
-  useEffect(() => {
     if (productAttributes.length === 0) return;
     setOpenAttributes(prev => {
       const next = { ...prev };
@@ -163,6 +146,27 @@ export function VariantSelector({ productId, basePrice, onVariantChange, initial
       return changed ? next : prev;
     });
   }, [productAttributes]);
+
+  useEffect(() => {
+    if (didApplyInitialVariant) return;
+    if (!initialVariantId) return;
+    if (!variants || variants.length === 0) return;
+    if (productAttributes.length === 0) return;
+
+    const v = variants.find((x) => x.id === initialVariantId);
+    if (!v || v.is_available === false || v.stock_quantity <= 0) {
+      setDidApplyInitialVariant(true);
+      onInvalidInitialVariant?.();
+      return;
+    }
+
+    const selection: Record<string, string> = {};
+    v.product_variant_values.forEach((pvv) => {
+      selection[pvv.product_attribute_values.attribute_id] = pvv.product_attribute_values.id;
+    });
+    setSelectedAttributes(selection);
+    setDidApplyInitialVariant(true);
+  }, [didApplyInitialVariant, initialVariantId, variants, productAttributes.length, onInvalidInitialVariant]);
 
   // Handle selection with smart switching for incompatible attributes
   const handleSelect = (attributeId: string, valueId: string) => {

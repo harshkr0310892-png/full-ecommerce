@@ -176,11 +176,13 @@ export default function AdminLogin() {
                       onChange={(e) => setOtp(e.target.value)}
                       placeholder="Enter OTP"
                       className="mt-1"
-                      inputMode="numeric"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       disabled={otpLoading}
                     />
                     <p className="text-xs text-muted-foreground mt-2">
-                      OTP is sent to the configured admin email.
+                      OTP is sent to the configured admin email and expires in 1 minute.
                     </p>
                   </div>
 

@@ -38,9 +38,8 @@ export function ProductCard({
   const { addItem } = useCartStore();
   const { addItem: addToWishlist, isInWishlist, removeItem: removeFromWishlist, clearNewItemFlag } = useWishlistStore();
   const discountedPrice = price * (1 - discount_percentage / 100);
-  const qty = Number(stock_quantity ?? 0);
-  const isSoldOut = stock_status === 'sold_out' || qty <= 0;
-  const isLowStock = !isSoldOut && qty > 0 && qty <= 10;
+  const isSoldOut = stock_status === 'sold_out';
+  const isLowStock = stock_status === 'low_stock';
   const displayImage = (images && images.length > 0) ? images[0] : image_url;
   const isWishlisted = isInWishlist(id);
 

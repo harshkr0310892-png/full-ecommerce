@@ -372,13 +372,7 @@ interface Order {
   return_request_date?: string | null;
   return_processed_date?: string | null;
   return_refund_amount?: number | null;
-  items?: {
-    product_name: string;
-    quantity: number;
-    product_price: number;
-    product_image?: string;
-    variant_info?: any;
-  }[];
+  items?: { product_name: string; quantity: number; product_price: number; product_image?: string }[];
   messages?: {
     id: string;
     message: string;
@@ -528,47 +522,24 @@ export default function CustomerProfile() {
     const ordersWithDetails = await Promise.all(
       (data || []).map(async (order) => {
         const { data: items } = await supabase
-          .from("order_items")
-          .select("product_name, quantity, product_price, product_id, variant_info")
-          .eq("order_id", order.id);
-
-        const productIds = Array.from(new Set((items || []).map((i: any) => i.product_id).filter(Boolean)));
-        const variantIds = Array.from(
-          new Set((items || []).map((i: any) => i?.variant_info?.variant_id as string | undefined).filter(Boolean))
+          .from('order_items')
+          .select('product_name, quantity, product_price, product_id')
+          .eq('order_id', order.id);
+        
+        const itemsWithImages = await Promise.all(
+          (items || []).map(async (item) => {
+            const { data: product } = await supabase
+              .from('products')
+              .select('image_url')
+              .eq('id', item.product_id)
+              .single();
+            
+            return {
+              ...item,
+              product_image: product?.image_url
+            };
+          })
         );
-
-        const productsMap: Record<string, any> = {};
-        if (productIds.length > 0) {
-          const { data: productsData } = await supabase
-            .from("products")
-            .select("id,image_url,images")
-            .in("id", productIds);
-          (productsData || []).forEach((p: any) => {
-            productsMap[p.id] = p;
-          });
-        }
-
-        const variantsMap: Record<string, string[]> = {};
-        if (variantIds.length > 0) {
-          const { data: variantsData } = await supabase
-            .from("product_variants" as any)
-            .select("id,image_urls")
-            .in("id", variantIds);
-          (variantsData || []).forEach((v: any) => {
-            variantsMap[v.id] = Array.isArray(v.image_urls) ? v.image_urls : [];
-          });
-        }
-
-        const itemsWithImages = (items || []).map((item: any) => {
-          const variantId = item?.variant_info?.variant_id as string | undefined;
-          const variantImage = variantId ? variantsMap[variantId]?.[0] : undefined;
-          const product = productsMap[item.product_id];
-          const productImage = product?.images?.[0] || product?.image_url;
-          return {
-            ...item,
-            product_image: variantImage || productImage,
-          };
-        });
         
         const { data: messages } = await supabase
           .from('order_messages')
@@ -1322,12 +1293,6 @@ export default function CustomerProfile() {
                                             )}
                                             <div className="min-w-0 flex-1">
                                               <p className="text-gray-200 font-medium truncate">{item.product_name}</p>
-                                              {item.variant_info?.attribute_name && (
-                                                <p className="text-gray-400 text-xs">
-                                                  {item.variant_info.attribute_name}:{" "}
-                                                  {(item.variant_info.value_name ?? item.variant_info.attribute_value) as any}
-                                                </p>
-                                              )}
                                               <p className="text-gray-400 text-xs">Qty: {item.quantity}</p>
                                             </div>
                                             <div className="text-amber-400/80 font-medium">
@@ -1394,12 +1359,6 @@ export default function CustomerProfile() {
                                             )}
                                             <div className="flex-1">
                                               <p className="text-gray-200 text-sm font-medium">{item.product_name}</p>
-                                              {item.variant_info?.attribute_name && (
-                                                <p className="text-gray-400 text-xs">
-                                                  {item.variant_info.attribute_name}:{" "}
-                                                  {(item.variant_info.value_name ?? item.variant_info.attribute_value) as any}
-                                                </p>
-                                              )}
                                               <p className="text-gray-400 text-xs">Qty: {item.quantity}</p>
                                             </div>
                                             <div className="text-amber-400/80 text-sm">
@@ -1591,12 +1550,58 @@ export default function CustomerProfile() {
 // Chatbot Component with Royal Theme
 const ChatbotComponent = () => {
   const [messages, setMessages] = useState<Array<{id: string; text: string; sender: 'user' | 'bot'; timestamp: Date; imageUrl?: string}>>([
-    { id: '1', text: 'Greetings, esteemed customer! I\'m your royal AI assistant. How may I serve you today?', sender: 'bot', timestamp: new Date() }
+    { id: '1', text: "Hi! I'm your AI assistant. You can talk to me in English, Hindi, ya Hinglish.", sender: 'bot', timestamp: new Date() }
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  type GeminiGenerateContentResponse = {
+    candidates?: Array<{
+      content?: { parts?: Array<{ text?: string }> };
+    }>;
+  };
+
+  const callCustomerProfileAi = async (messagesPayload: unknown) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      throw new Error("Session expired. Please login again.");
+    }
+
+    let accessToken = session.access_token;
+    if (typeof session.expires_at === "number" && session.expires_at * 1000 < Date.now() + 60_000) {
+      const refreshed = await supabase.auth.refreshSession().catch(() => null);
+      accessToken = refreshed?.data?.session?.access_token ?? accessToken;
+    }
+
+    const { data, error } = await supabase.functions.invoke("customer-profile-ai", {
+      body: messagesPayload,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (error) {
+      const ctx = (error as unknown as { context?: Response } | null)?.context;
+      const statusPart = ctx ? ` (${ctx.status})` : "";
+      const bodyText = ctx ? await ctx.clone().text().catch(() => "") : "";
+      const bodyPart = bodyText.trim() ? `: ${bodyText}` : "";
+      throw new Error((error.message || "AI request failed") + statusPart + bodyPart);
+    }
+
+    if ((data as { error?: string } | null)?.error) {
+      throw new Error((data as { error: string }).error);
+    }
+
+    return data;
+  };
+
+  const extractGeminiText = (response: unknown) => {
+    const r = response as GeminiGenerateContentResponse;
+    const text = r?.candidates?.[0]?.content?.parts?.[0]?.text;
+    return typeof text === 'string' && text.trim() ? text : null;
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1630,7 +1635,7 @@ const ChatbotComponent = () => {
 
     try {
       const apiMessages = [
-        { role: 'system', content: 'You are a royal AI assistant that serves premium customers with elegance. Be courteous, helpful, and add a touch of sophistication to your responses.', imageUrl: undefined },
+        { role: 'system', content: 'You are a helpful, friendly assistant. Reply in the same language as the user (English, Hindi, or Hinglish). Keep the tone normal and casual. Avoid royal/servant-style language. Keep responses clear and not too long.', imageUrl: undefined },
         ...messages.map(msg => ({
           role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
           content: msg.text,
@@ -1639,12 +1644,9 @@ const ChatbotComponent = () => {
         { role: 'user', content: messageToSend, imageUrl: uploadedImage || undefined }
       ];
 
-      const { default: GeminiService } = await import('@/lib/sambanova');
-      const serviceInstance = new GeminiService();
-      
-      const response = await serviceInstance.generateContent(apiMessages);
-      
-      const botResponse = response.candidates?.[0]?.content?.parts?.[0]?.text || "My apologies, I couldn't process that. Could you kindly try again?";
+      const data = await callCustomerProfileAi({ messages: apiMessages, model: "gemini-3-flash-preview", temperature: 0.1 });
+
+      const botResponse = extractGeminiText(data) || "Sorry, I couldn't process that. Please try again.";
       
       const botMessage = {
         id: (Date.now() + 1).toString(),
@@ -1656,9 +1658,10 @@ const ChatbotComponent = () => {
       setMessages(prev => [...prev, botMessage]);
     } catch (error) {
       console.error('Error with chatbot:', error);
+      const msg = error instanceof Error ? error.message : "Unknown error";
       const errorMessage = {
         id: (Date.now() + 1).toString(),
-        text: "My apologies, I'm experiencing some difficulties at the moment. Please try again later.",
+        text: `Sorry, I'm having a problem right now. (${msg})`,
         sender: 'bot' as const,
         timestamp: new Date()
       };
@@ -1681,7 +1684,7 @@ const ChatbotComponent = () => {
 
   const clearChat = () => {
     setMessages([
-      { id: '1', text: 'Greetings, esteemed customer! I\'m your royal AI assistant. How may I serve you today?', sender: 'bot', timestamp: new Date() }
+      { id: '1', text: "Hi! I'm your AI assistant. You can talk to me in English, Hindi, ya Hinglish.", sender: 'bot', timestamp: new Date() }
     ]);
     setUploadedImage(null);
   };
@@ -1691,7 +1694,7 @@ const ChatbotComponent = () => {
     
     const jokeMessage = {
       id: Date.now().toString(),
-      text: "Tell me a royal joke",
+      text: "Tell me a joke",
       sender: 'user' as const,
       timestamp: new Date()
     };
@@ -1701,21 +1704,18 @@ const ChatbotComponent = () => {
 
     try {
       const apiMessages = [
-        { role: 'system', content: 'You are a royal AI assistant with a refined sense of humor. Share an elegant, witty joke.', imageUrl: undefined },
+        { role: 'system', content: 'You are a helpful assistant with a light, friendly sense of humor. Tell a short, clean joke. Reply in the same language as the user (English, Hindi, or Hinglish).', imageUrl: undefined },
         ...messages.map(msg => ({
           role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
           content: msg.text,
           imageUrl: msg.imageUrl
         })),
-        { role: 'user', content: 'Tell me a royal joke', imageUrl: undefined }
+        { role: 'user', content: 'Tell me a joke', imageUrl: undefined }
       ];
 
-      const { default: GeminiService } = await import('@/lib/sambanova');
-      const serviceInstance = new GeminiService();
-      
-      const response = await serviceInstance.generateContent(apiMessages);
-      
-      const jokeResponse = response.candidates?.[0]?.content?.parts?.[0]?.text || "Why did the king go to the dentist? To get his teeth crowned! 👑";
+      const data = await callCustomerProfileAi({ messages: apiMessages, model: "gemini-3-flash-preview", temperature: 0.1 });
+
+      const jokeResponse = extractGeminiText(data) || "Why did the computer go to the doctor? Because it caught a virus.";
       
       const botMessage = {
         id: (Date.now() + 1).toString(),
@@ -1727,9 +1727,10 @@ const ChatbotComponent = () => {
       setMessages(prev => [...prev, botMessage]);
     } catch (error) {
       console.error('Error with chatbot joke:', error);
+      const msg = error instanceof Error ? error.message : "Unknown error";
       const errorMessage = {
         id: (Date.now() + 1).toString(),
-        text: "My apologies, I'm having trouble connecting at the moment. Here's a classic: Why did the king go to the dentist? To get his teeth crowned! 👑",
+        text: `Sorry, I'm having trouble connecting right now. (${msg})`,
         sender: 'bot' as const,
         timestamp: new Date()
       };
@@ -1748,9 +1749,9 @@ const ChatbotComponent = () => {
       >
         <div>
           <h3 className="gold-text text-lg font-semibold flex items-center gap-2">
-            <Crown className="w-5 h-5 text-amber-400" /> Royal AI Assistant
+            <Sparkles className="w-5 h-5 text-amber-400" /> AI Assistant
           </h3>
-          <p className="text-gray-400 text-xs mt-1">Your personal concierge at your service</p>
+          <p className="text-gray-400 text-xs mt-1">English / Hindi / Hinglish</p>
         </div>
         <div className="flex gap-2">
           <button 
@@ -1758,14 +1759,14 @@ const ChatbotComponent = () => {
             onClick={tellJoke}
             disabled={isLoading}
           >
-            <span>👑</span> Royal Joke
+            Joke
           </button>
           <button 
             className="royal-btn-outline px-3 py-1.5 rounded-lg text-xs flex items-center gap-1"
             onClick={clearChat}
             disabled={isLoading}
           >
-            <span>🗑️</span> Clear
+            Clear
           </button>
         </div>
       </div>

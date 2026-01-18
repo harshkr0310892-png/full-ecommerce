@@ -100,14 +100,13 @@ export default function Wishlist() {
       }
 
       if (variantIds.length > 0) {
-        const { data: variantsData, error: variantsError } = await supabase
-          .from("product_variants" as any)
+        const { data: variantsData, error: variantsError } = await (supabase
+          .from("product_variants" as any) as any)
           .select("id,is_available")
           .in("id", variantIds);
         if (!active) return;
         if (!variantsError) {
-          const variants = (variantsData as any[]) || [];
-          const found = new Set(variants.map((v: any) => v.id));
+          const found = new Set((variantsData || []).map((v: any) => v.id));
           items.forEach((it) => {
             const vid = it.variant_info?.variant_id;
             if (!vid) return;
@@ -115,7 +114,7 @@ export default function Wishlist() {
               next[it.id] = { product: next[it.id]?.product ?? false, option: true };
               return;
             }
-            const v: any = variants.find((x: any) => x.id === vid) as any;
+            const v = (variantsData || []).find((x: any) => x.id === vid);
             if (v && v.is_available === false) next[it.id] = { product: next[it.id]?.product ?? false, option: true };
           });
         }
@@ -166,15 +165,14 @@ export default function Wishlist() {
     try {
       const variantId = item?.variant_info?.variant_id as string | undefined;
       if (variantId) {
-        const { data, error } = await supabase
-          .from("product_variants" as any)
+        const { data, error } = await (supabase
+          .from("product_variants" as any) as any)
           .select("stock_quantity,is_available")
           .eq("id", variantId)
           .maybeSingle();
         if (error) throw error;
-        const row: any = data as any;
-        const stockQty = row?.stock_quantity === null || row?.stock_quantity === undefined ? null : Number(row.stock_quantity);
-        if (row && row.is_available === false) {
+        const stockQty = data?.stock_quantity === null || data?.stock_quantity === undefined ? null : Number(data.stock_quantity);
+        if (data && data.is_available === false) {
           toast.error("This option is unavailable.");
           return;
         }
@@ -193,9 +191,8 @@ export default function Wishlist() {
         .eq("id", item.id)
         .maybeSingle();
       if (error) throw error;
-      const row: any = data as any;
-      const stockQty = row?.stock_quantity === null || row?.stock_quantity === undefined ? null : Number(row.stock_quantity);
-      const status = (row?.stock_status || "").toString().toLowerCase();
+      const stockQty = data?.stock_quantity === null || data?.stock_quantity === undefined ? null : Number(data.stock_quantity);
+      const status = (data?.stock_status || "").toString().toLowerCase();
       if (["deleted", "inactive", "unavailable", "sold_out"].includes(status)) {
         toast.error("This product is unavailable.");
         return;

@@ -468,8 +468,8 @@ export default function ProductDetail() {
         return;
       }
 
-      const { data: inserted, error: insertError } = await supabase
-        .from('product_reviews' as any)
+      const { data: inserted, error: insertError } = await (supabase
+        .from('product_reviews' as any) as any)
         .insert({
           product_id: id,
           user_id: session.user.id,
@@ -482,8 +482,8 @@ export default function ProductDetail() {
         .single();
 
       if (insertError) throw insertError;
-      createdReviewId = (inserted as unknown as { id?: string } | null)?.id;
-      if (!createdReviewId) throw new Error('Failed to create review');
+      createdReviewId = (inserted as any)?.id;
+      if (!createdReviewId) throw new Error("Failed to create review");
 
       const imageUrls: string[] = [];
       for (const file of reviewFiles) {
@@ -530,8 +530,8 @@ export default function ProductDetail() {
   const { data: productVariants } = useQuery({
     queryKey: ['product-variants-count', id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('product_variants')
+      const { data, error } = await (supabase
+        .from('product_variants' as any) as any)
         .select('id')
         .eq('product_id', id);
       

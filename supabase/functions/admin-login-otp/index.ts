@@ -1,6 +1,11 @@
 export {};
 
-const Deno = (globalThis as any).Deno;
+type DenoLike = {
+  env: { get(key: string): string | undefined };
+  serve: (handler: (req: Request) => Response | Promise<Response>) => void;
+};
+
+const Deno = (globalThis as unknown as { Deno: DenoLike }).Deno;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,6 +43,56 @@ function randomDigits(length: number) {
   return out;
 }
 
+function randomInt(maxExclusive: number) {
+  if (!Number.isFinite(maxExclusive) || maxExclusive <= 0) throw new Error("Invalid maxExclusive");
+  const max = Math.floor(maxExclusive);
+  const range = 0x1_0000_0000;
+  const limit = range - (range % max);
+  const buf = new Uint32Array(1);
+  while (true) {
+    crypto.getRandomValues(buf);
+    const x = buf[0]!;
+    if (x < limit) return x % max;
+  }
+}
+
+function shuffleInPlace<T>(arr: T[]) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function randomAdminOtp(tokenLength: number) {
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lower = "abcdefghijklmnopqrstuvwxyz";
+  const digits = "0123456789";
+  const symbols = "!@#$%^&*()-_=+[]{};:,.?/|~";
+  const emojis = ["🔒", "🛡", "🔥", "✅", "🎯", "⚡", "🚀", "💎", "🌟", "🧩", "🧠", "🧱", "🪙", "🎉", "🕶"];
+
+  const groups: Array<{ kind: string; pool: string[] }> = [
+    { kind: "upper", pool: upper.split("") },
+    { kind: "lower", pool: lower.split("") },
+    { kind: "digit", pool: digits.split("") },
+    { kind: "symbol", pool: symbols.split("") },
+    { kind: "emoji", pool: emojis.slice() },
+  ];
+
+  if (!Number.isFinite(tokenLength) || tokenLength < groups.length) {
+    throw new Error("Invalid tokenLength");
+  }
+
+  const tokens: string[] = [];
+  for (const g of groups) tokens.push(g.pool[randomInt(g.pool.length)]!);
+
+  const allPools = groups.flatMap((g) => g.pool);
+  while (tokens.length < tokenLength) tokens.push(allPools[randomInt(allPools.length)]!);
+
+  shuffleInPlace(tokens);
+  return tokens.join("");
+}
+
 function otpEmailHtml(opts: { appName: string; otp: string; minutes: number; logoUrl?: string | null }) {
   const { appName, otp, minutes, logoUrl } = opts;
   const safeLogo = logoUrl ? String(logoUrl) : "";
@@ -64,8 +119,20 @@ function otpEmailHtml(opts: { appName: string; otp: string; minutes: number; log
             Use the OTP below to complete admin login. This code expires in <b>${minutes} minutes</b>.
           </p>
           <div style="margin:18px 0 10px;padding:18px;border:1px dashed #c7cbe2;border-radius:12px;background:#f8fafc;text-align:center;">
-            <div style="font-size:28px;font-weight:800;letter-spacing:6px;color:#0f172a;">${otp}</div>
+            <div style="font-size:22px;font-weight:800;letter-spacing:0;color:#0f172a;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,monospace;word-break:break-all;line-height:1.4;">${otp}</div>
           </div>
+          <div style="text-align:center;margin:12px 0 0;">
+            <a
+              href="#"
+              onclick='(function(){try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(${JSON.stringify(otp)});}}catch(e){}})();return false;'
+              style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;font-size:13px;font-weight:700;padding:10px 14px;border-radius:10px;"
+            >
+              Copy OTP
+            </a>
+          </div>
+          <p style="margin:10px 0 0;font-size:12px;line-height:1.55;color:#475569;text-align:center;">
+            If the button doesn’t work, select the OTP text and copy.
+          </p>
           <p style="margin:12px 0 0;font-size:12px;line-height:1.55;color:#475569;">
             If you didn’t request this, you can ignore this email.
           </p>
@@ -154,7 +221,7 @@ async function pgSelectOne(params: {
   if (!res.ok) return null;
   const data = await res.json();
   if (!Array.isArray(data) || data.length === 0) return null;
-  return data[0] as any;
+  return data[0] as unknown;
 }
 
 Deno.serve(async (req: Request) => {
@@ -194,27 +261,27 @@ Deno.serve(async (req: Request) => {
     const userAgent = req.headers.get("user-agent") || null;
 
     if (action === "request") {
-      const last = await pgSelectOne({
+      const last = (await pgSelectOne({
         supabaseUrl: SUPABASE_URL,
         serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
         table: "admin_login_otps",
         select: "id,created_at,expires_at,consumed_at",
         filters: { email: `eq.${ADMIN_OTP_EMAIL}`, consumed_at: "is.null" },
         order: "created_at.desc",
-      });
+      })) as { created_at?: string } | null;
 
       if (last?.created_at) {
         const ageMs = Date.now() - new Date(last.created_at).getTime();
-        if (ageMs < 60_000) {
+        if (ageMs < 10_000) {
           return json({ ok: true });
         }
       }
 
-      const otp = randomDigits(6);
+      const otp = randomAdminOtp(15);
       const otpSalt = base64Url(crypto.getRandomValues(new Uint8Array(16)));
       const otpHash = await sha256Hex(`${otp}:${otpSalt}:${OTP_PEPPER}`);
 
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      const expiresAt = new Date(Date.now() + 1 * 60 * 1000).toISOString();
 
       await pgPatch({
         supabaseUrl: SUPABASE_URL,
@@ -241,7 +308,7 @@ Deno.serve(async (req: Request) => {
 
       if (!RESEND_API_KEY) return json({ ok: true });
 
-      const html = otpEmailHtml({ appName: APP_NAME, otp, minutes: 10, logoUrl: ADMIN_OTP_LOGO_URL || null });
+      const html = otpEmailHtml({ appName: APP_NAME, otp, minutes: 1, logoUrl: ADMIN_OTP_LOGO_URL || null });
 
       const sendRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -264,9 +331,9 @@ Deno.serve(async (req: Request) => {
 
     if (action === "verify") {
       const otp = (body?.otp ?? "").toString().trim();
-      if (otp.length < 4) return json({ error: "Invalid OTP" }, { status: 400 });
+      if (otp.length < 10 || otp.length > 128) return json({ error: "Invalid OTP" }, { status: 400 });
 
-      const row = await pgSelectOne({
+      const row = (await pgSelectOne({
         supabaseUrl: SUPABASE_URL,
         serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
         table: "admin_login_otps",
@@ -277,7 +344,7 @@ Deno.serve(async (req: Request) => {
           expires_at: `gt.${new Date().toISOString()}`,
         },
         order: "created_at.desc",
-      });
+      })) as { id: string; otp_hash: string; otp_salt: string; attempts?: number | null } | null;
 
       if (!row) return json({ error: "OTP expired" }, { status: 400 });
 
@@ -317,8 +384,8 @@ Deno.serve(async (req: Request) => {
     }
 
     return json({ error: "Invalid action" }, { status: 400 });
-  } catch (err: any) {
-    return json({ error: err?.message ?? "Unknown error" }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return json({ error: message }, { status: 500 });
   }
 });
-

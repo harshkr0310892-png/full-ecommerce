@@ -42,7 +42,6 @@ interface OrderItem {
   product_name: string;
   product_price: number;
   quantity: number;
-  variant_info?: any;
 }
 
 interface Product {
@@ -79,7 +78,6 @@ export default function TrackOrder() {
   const [order, setOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [products, setProducts] = useState<Record<string, Product>>({});
-  const [variantImages, setVariantImages] = useState<Record<string, string[]>>({});
   const [messages, setMessages] = useState<OrderMessage[]>([]);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelOrderId, setCancelOrderId] = useState('');
@@ -228,29 +226,6 @@ export default function TrackOrder() {
           productsData.forEach(p => { productsMap[p.id] = p; });
           setProducts(productsMap);
         }
-      }
-
-      const variantIds = Array.from(
-        new Set(
-          (itemsData || [])
-            .map((i: any) => i?.variant_info?.variant_id as string | undefined)
-            .filter(Boolean)
-        )
-      );
-      if (variantIds.length > 0) {
-        const { data: variantsData } = await supabase
-          .from("product_variants" as any)
-          .select("id,image_urls")
-          .in("id", variantIds);
-        if (variantsData) {
-          const map: Record<string, string[]> = {};
-          (variantsData as any[]).forEach((v) => {
-            map[v.id] = Array.isArray(v.image_urls) ? v.image_urls : [];
-          });
-          setVariantImages(map);
-        }
-      } else {
-        setVariantImages({});
       }
 
       // Fetch messages (only admin messages for display)
@@ -807,9 +782,7 @@ export default function TrackOrder() {
                   <div className="space-y-3 max-h-60 overflow-y-auto">
                     {orderItems.map((item) => {
                       const product = products[item.product_id];
-                      const variantId = (item as any)?.variant_info?.variant_id as string | undefined;
-                      const variantImage = variantId ? variantImages[variantId]?.[0] : undefined;
-                      const imageUrl = variantImage || product?.images?.[0] || product?.image_url;
+                      const imageUrl = product?.images?.[0] || product?.image_url;
                       return (
                         <div key={item.id} className="flex gap-3 pb-3 border-b border-border/50 last:border-0">
                           {imageUrl && (
@@ -823,12 +796,6 @@ export default function TrackOrder() {
                             <p className="font-medium text-sm truncate">{item.product_name}</p>
                             {product?.description && (
                               <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>
-                            )}
-                            {(item as any)?.variant_info?.attribute_name && (
-                              <p className="text-xs text-muted-foreground">
-                                {(item as any).variant_info.attribute_name}:{" "}
-                                {((item as any).variant_info.value_name ?? (item as any).variant_info.attribute_value) as any}
-                              </p>
                             )}
                             <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
                           </div>

@@ -86,7 +86,6 @@ Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/c
 - `APP_NAME`
 - `TRACK_BASE_URL` (optional)
 - `ALLOW_LOOKUP_BY_PUBLIC_ORDER_ID` (optional, default false)
-- `ORDER_NOTIFIER_WEBHOOK_SECRET` (HMAC-SHA256 shared secret)
 
 **Deploy**
 ```sh
@@ -104,13 +103,3 @@ supabase functions logs order-notifier
 ```
 
 Note: `order-notifier` DB triggers se call hota hai, isliye function ko public rakha gaya hai (`verify_jwt=false`).
-
-**Extra security (recommended)**
-- Database → Vault me ek secret banao:
-  - name: `order_notifier_webhook_secret`
-  - value: same as `ORDER_NOTIFIER_WEBHOOK_SECRET`
-- Phir DB migrate/push karo:
-```sh
-supabase db push
-supabase functions deploy order-notifier
-```
