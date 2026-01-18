@@ -983,6 +983,12 @@ export default function SellerDashboard() {
       const activeSellerName = seller?.name || sellerName;
 
       if (!activeSellerId || !activeSellerName) throw new Error("Seller not detected");
+      const rawQty = parseInt(product.stock_quantity) || 0;
+      const normalizedStockStatus = rawQty <= 0
+        ? "sold_out"
+        : product.stock_status === "sold_out"
+          ? "sold_out"
+          : "in_stock";
       const data = {
         name: product.name,
         description: product.description || null,
@@ -990,8 +996,8 @@ export default function SellerDashboard() {
         discount_percentage: parseInt(product.discount_percentage) || 0,
         image_url: productImages[0] || null,
         images: productImages,
-        stock_status: product.stock_status,
-        stock_quantity: parseInt(product.stock_quantity) || 0,
+        stock_status: normalizedStockStatus,
+        stock_quantity: rawQty,
         category_id: product.category_id || product.main_category_id || null,
         cash_on_delivery: Boolean(product.cash_on_delivery),
         features: product.features,
@@ -1492,7 +1498,7 @@ export default function SellerDashboard() {
                             <SelectContent>
                               <SelectItem value="in_stock">In Stock</SelectItem>
                               <SelectItem value="low_stock">Low Stock</SelectItem>
-                              <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+                              <SelectItem value="sold_out">Out of Stock</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -1660,16 +1666,23 @@ export default function SellerDashboard() {
                         {product.discount_percentage && product.discount_percentage > 0 && (
                           <span className="text-green-600">-{product.discount_percentage}%</span>
                         )}
+                        {(() => {
+                          const qty = Number(product.stock_quantity || 0);
+                          const soldOut = product.stock_status === "sold_out" || qty <= 0;
+                          const lowStock = !soldOut && qty > 0 && qty <= 10;
+                          return (
                         <span
                           className={cn(
                             "px-2 py-0.5 rounded-full text-xs",
-                            product.stock_status === "in_stock" && "bg-green-500/10 text-green-600",
-                            product.stock_status === "low_stock" && "bg-yellow-500/10 text-yellow-600",
-                            product.stock_status === "out_of_stock" && "bg-red-500/10 text-red-600"
+                            soldOut && "bg-red-500/10 text-red-600",
+                            lowStock && "bg-yellow-500/10 text-yellow-600",
+                            !soldOut && !lowStock && "bg-green-500/10 text-green-600"
                           )}
                         >
                           {(product.stock_quantity || 0)} left
                         </span>
+                          );
+                        })()}
                       </div>
                     </div>
                     <div className="flex gap-2">

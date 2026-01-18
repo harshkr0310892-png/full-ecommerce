@@ -86,7 +86,7 @@ export default function Checkout() {
       });
       (data || []).forEach((p: any) => {
         const s = (p.stock_status || "").toString().toLowerCase();
-        if (["deleted", "inactive", "unavailable", "sold_out", "out_of_stock"].includes(s)) unavailable.add(p.id);
+        if (["deleted", "inactive", "unavailable", "sold_out"].includes(s)) unavailable.add(p.id);
       });
       const toRemove = items.filter((it: any) => unavailable.has((it.product_id || it.id.split("#")[0]) as string));
       if (toRemove.length > 0) {
@@ -568,7 +568,7 @@ export default function Checkout() {
         });
         (productsData || []).forEach((p: any) => {
           const s = (p.stock_status || "").toString().toLowerCase();
-          if (["deleted", "inactive", "unavailable", "sold_out", "out_of_stock"].includes(s)) unavailable.add(p.id);
+          if (["deleted", "inactive", "unavailable", "sold_out"].includes(s)) unavailable.add(p.id);
         });
         const toRemove = items.filter((it: any) => unavailable.has((it.product_id || it.id.split("#")[0]) as string));
         if (toRemove.length > 0) {

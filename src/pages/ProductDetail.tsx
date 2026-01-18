@@ -703,7 +703,7 @@ export default function ProductDetail() {
     : product?.stock_status === 'sold_out';
   const isLowStock = selectedVariant 
     ? (selectedVariant.stock_quantity > 0 && selectedVariant.stock_quantity <= 10)
-    : product?.stock_status === 'low_stock';
+    : (Number(product?.stock_quantity || 0) > 0 && Number(product?.stock_quantity || 0) <= 10 && product?.stock_status !== 'sold_out');
   const stockQuantity = selectedVariant ? selectedVariant.stock_quantity : (product?.stock_quantity || 0);
 
   // Get all images - combine images array with legacy image_url and variant images
