@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 
 export default function Cart() {
   const navigate = useNavigate();
-  const { items, updateQuantity, removeItem, getTotal, getDiscountedTotal, clearCart } = useCartStore();
+  const { items, updateItem, updateQuantity, removeItem, getTotal, getDiscountedTotal, clearCart } = useCartStore();
   const total = getTotal();
   const discountedTotal = getDiscountedTotal();
   const savings = total - discountedTotal;
@@ -38,7 +38,7 @@ export default function Cart() {
     (async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id,stock_status")
+        .select("id,stock_status,stock_quantity")
         .in("id", productIds);
       if (!active) return;
       if (error) return;
@@ -57,11 +57,22 @@ export default function Cart() {
         toRemove.forEach((it: any) => removeItem(it.id));
         toast.error("Some items were removed because the product is unavailable.");
       }
+
+      const productMap = new Map<string, any>((data || []).map((p: any) => [p.id, p]));
+      items.forEach((it: any) => {
+        if (it?.variant_info?.variant_id) return;
+        const pid = (it.product_id || it.id.split("#")[0]) as string;
+        const p = productMap.get(pid);
+        if (!p) return;
+        const qty = p.stock_quantity === null || p.stock_quantity === undefined ? null : Number(p.stock_quantity);
+        updateItem(it.id, { stock_quantity: qty });
+        if (qty !== null && it.quantity > qty) updateQuantity(it.id, qty);
+      });
     })();
     return () => {
       active = false;
     };
-  }, [items, productIds, removeItem]);
+  }, [items, productIds, removeItem, updateItem, updateQuantity]);
 
   useEffect(() => {
     if (variantIds.length === 0) {
@@ -72,13 +83,14 @@ export default function Cart() {
     (async () => {
       const { data, error } = await supabase
         .from("product_variants" as any)
-        .select("id,image_urls,is_available")
+        .select("id,image_urls,is_available,stock_quantity")
         .in("id", variantIds);
       if (!active) return;
       if (error) return;
+      const variants = (data as any[]) || [];
       const map: Record<string, string[]> = {};
-      const found = new Set((data || []).map((v: any) => v.id));
-      (data || []).forEach((v: any) => {
+      const found = new Set(variants.map((v: any) => v.id));
+      variants.forEach((v: any) => {
         map[v.id] = Array.isArray(v.image_urls) ? v.image_urls : [];
       });
       setVariantImages(map);
@@ -87,7 +99,7 @@ export default function Cart() {
         const vid = it?.variant_info?.variant_id;
         if (!vid) return false;
         if (!found.has(vid)) return true;
-        const v = (data || []).find((x: any) => x.id === vid);
+        const v = variants.find((x: any) => x.id === vid);
         if (v && v.is_available === false) return true;
         return false;
       });
@@ -95,11 +107,22 @@ export default function Cart() {
         removedLines.forEach((it: any) => removeItem(it.id));
         toast.error("Some items were removed because the option is unavailable.");
       }
+
+      const variantMap = new Map<string, any>(variants.map((v: any) => [v.id, v]));
+      items.forEach((it: any) => {
+        const vid = it?.variant_info?.variant_id as string | undefined;
+        if (!vid) return;
+        const v = variantMap.get(vid);
+        if (!v) return;
+        const qty = v.stock_quantity === null || v.stock_quantity === undefined ? null : Number(v.stock_quantity);
+        updateItem(it.id, { stock_quantity: qty });
+        if (qty !== null && it.quantity > qty) updateQuantity(it.id, qty);
+      });
     })();
     return () => {
       active = false;
     };
-  }, [items, removeItem, variantIds]);
+  }, [items, removeItem, updateItem, updateQuantity, variantIds]);
 
   const handleCheckout = async () => {
     // Check if user is authenticated
@@ -153,6 +176,8 @@ export default function Cart() {
               const variantId = (item as any)?.variant_info?.variant_id as string | undefined;
               const variantImage = variantId ? variantImages[variantId]?.[0] : undefined;
               const imageUrl = variantImage || item.image_url;
+              const maxQty = (item as any).stock_quantity ?? null;
+              const isAtMax = maxQty !== null && maxQty !== undefined && item.quantity >= Number(maxQty);
               
               return (
                 <div 
@@ -222,7 +247,8 @@ export default function Cart() {
                         <span className="px-4 py-2 font-medium">{item.quantity}</span>
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                          className="p-2 hover:bg-muted transition-colors"
+                          className={cn("p-2 transition-colors", isAtMax ? "opacity-50 cursor-not-allowed" : "hover:bg-muted")}
+                          disabled={isAtMax}
                         >
                           <Plus className="w-4 h-4" />
                         </button>

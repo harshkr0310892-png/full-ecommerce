@@ -482,7 +482,8 @@ export default function ProductDetail() {
         .single();
 
       if (insertError) throw insertError;
-      createdReviewId = inserted.id;
+      createdReviewId = (inserted as unknown as { id?: string } | null)?.id;
+      if (!createdReviewId) throw new Error('Failed to create review');
 
       const imageUrls: string[] = [];
       for (const file of reviewFiles) {
@@ -613,6 +614,7 @@ export default function ProductDetail() {
         price: finalPrice,
         discount_percentage: selectedVariant ? 0 : (product.discount_percentage || 0),
         image_url: displayImage,
+        stock_quantity: selectedVariant ? selectedVariant.stock_quantity : (product as any).stock_quantity ?? null,
         variant_info: selectedVariant ? {
           variant_id: selectedVariant.id,
           attribute_name: selectedVariant.attribute_name,

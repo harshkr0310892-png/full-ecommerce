@@ -106,7 +106,8 @@ export default function Wishlist() {
           .in("id", variantIds);
         if (!active) return;
         if (!variantsError) {
-          const found = new Set((variantsData || []).map((v: any) => v.id));
+          const variants = (variantsData as any[]) || [];
+          const found = new Set(variants.map((v: any) => v.id));
           items.forEach((it) => {
             const vid = it.variant_info?.variant_id;
             if (!vid) return;
@@ -114,7 +115,7 @@ export default function Wishlist() {
               next[it.id] = { product: next[it.id]?.product ?? false, option: true };
               return;
             }
-            const v = (variantsData || []).find((x: any) => x.id === vid);
+            const v: any = variants.find((x: any) => x.id === vid) as any;
             if (v && v.is_available === false) next[it.id] = { product: next[it.id]?.product ?? false, option: true };
           });
         }
@@ -152,7 +153,7 @@ export default function Wishlist() {
     }
   };
 
-  const handleAddToCart = (item: any) => {
+  const handleAddToCart = async (item: any) => {
     const u = unavailable[item.id];
     if (u?.product) {
       toast.error("This product is unavailable.");
@@ -162,8 +163,53 @@ export default function Wishlist() {
       toast.error("This option is unavailable.");
       return;
     }
-    addItemToCart(item);
-    toast.success(`${item.name} added to cart!`);
+    try {
+      const variantId = item?.variant_info?.variant_id as string | undefined;
+      if (variantId) {
+        const { data, error } = await supabase
+          .from("product_variants" as any)
+          .select("stock_quantity,is_available")
+          .eq("id", variantId)
+          .maybeSingle();
+        if (error) throw error;
+        const row: any = data as any;
+        const stockQty = row?.stock_quantity === null || row?.stock_quantity === undefined ? null : Number(row.stock_quantity);
+        if (row && row.is_available === false) {
+          toast.error("This option is unavailable.");
+          return;
+        }
+        if (stockQty !== null && stockQty <= 0) {
+          toast.error("You're too late — this option is now out of stock.");
+          return;
+        }
+        addItemToCart({ ...item, stock_quantity: stockQty });
+        toast.success(`${item.name} added to cart!`);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("products")
+        .select("stock_quantity,stock_status")
+        .eq("id", item.id)
+        .maybeSingle();
+      if (error) throw error;
+      const row: any = data as any;
+      const stockQty = row?.stock_quantity === null || row?.stock_quantity === undefined ? null : Number(row.stock_quantity);
+      const status = (row?.stock_status || "").toString().toLowerCase();
+      if (["deleted", "inactive", "unavailable", "sold_out"].includes(status)) {
+        toast.error("This product is unavailable.");
+        return;
+      }
+      if (stockQty !== null && stockQty <= 0) {
+        toast.error("You're too late — this item is now out of stock.");
+        return;
+      }
+      addItemToCart({ ...item, stock_quantity: stockQty });
+      toast.success(`${item.name} added to cart!`);
+    } catch {
+      addItemToCart(item);
+      toast.success(`${item.name} added to cart!`);
+    }
   };
 
   const discountedPrice = (price: number, discount_percentage: number) => {

@@ -331,7 +331,7 @@ export default function SellerDashboard() {
     queryFn: async () => {
       const id = seller?.id || sellerId;
       if (!id) return [];
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("products")
         .select("*")
         .eq("seller_id", id)
@@ -378,13 +378,13 @@ export default function SellerDashboard() {
     queryKey: ['seller-product-reviews', selectedReviewProductId],
     queryFn: async () => {
       if (!selectedReviewProductId) return [] as ProductReview[];
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('product_reviews' as any)
         .select('id, product_id, user_id, rating, description, reviewer_name, reviewer_avatar_url, created_at, product_review_images(image_url)')
         .eq('product_id', selectedReviewProductId)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return (data || []) as ProductReview[];
+      return (data as unknown as ProductReview[]) || [];
     },
     enabled: activeTab === 'reviews' && !!selectedReviewProductId,
   });
@@ -431,14 +431,14 @@ export default function SellerDashboard() {
   const { data: categories, refetch: refetchCategories } = useQuery({
     queryKey: ["public-categories"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("categories")
         .select("*")
         .is("seller_id", null)
         .eq("is_active", true)
         .order("sort_order", { ascending: true });
       if (error) throw error;
-      return data as Category[];
+      return (data as unknown as Category[]) || [];
     },
   });
 
@@ -448,13 +448,13 @@ export default function SellerDashboard() {
     queryFn: async () => {
       const id = seller?.id || sellerId;
       if (!id) return [] as Category[];
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("categories")
         .select("*")
         .eq("seller_id", id)
         .order("sort_order", { ascending: true });
       if (error) throw error;
-      return data as Category[];
+      return (data as unknown as Category[]) || [];
     },
     enabled: !!(seller?.id || sellerId),
   });
@@ -482,7 +482,7 @@ export default function SellerDashboard() {
         sort_order: 0,
         is_active: true,
       };
-      const { error } = await supabase.from("categories").insert(data);
+      const { error } = await (supabase as any).from("categories").insert(data);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -501,7 +501,7 @@ export default function SellerDashboard() {
       const activeSellerId = seller?.id || sellerId;
       if (!activeSellerId) throw new Error("Seller not detected");
       const data = { name: payload.name, description: payload.description || null };
-      const { error } = await supabase.from("categories").update(data).eq("id", payload.id).eq("seller_id", activeSellerId);
+      const { error } = await (supabase as any).from("categories").update(data).eq("id", payload.id).eq("seller_id", activeSellerId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -517,7 +517,7 @@ export default function SellerDashboard() {
     mutationFn: async (id: string) => {
       const activeSellerId = seller?.id || sellerId;
       if (!activeSellerId) throw new Error("Seller not detected");
-      const { error } = await supabase.from("categories").delete().eq("id", id).eq("seller_id", activeSellerId);
+      const { error } = await (supabase as any).from("categories").delete().eq("id", id).eq("seller_id", activeSellerId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -543,7 +543,7 @@ export default function SellerDashboard() {
       const orderIdsSet = new Set<string>();
 
       // (A) Snapshot-based lookup - using product_id instead of seller_id
-      const { data: snapshotItems, error: snapshotError } = await supabase
+      const { data: snapshotItems, error: snapshotError } = await (supabase as any)
         .from("order_items")
         .select("order_id")
         .in('product_id', (sellerProducts || []).map(p => p.id));
@@ -551,7 +551,7 @@ export default function SellerDashboard() {
       (snapshotItems || []).forEach((it: any) => orderIdsSet.add(it.order_id as string));
 
       // (B) Fallback join-based lookup (works only while products still exist)
-      const { data: joinItems, error: joinError } = await supabase
+      const { data: joinItems, error: joinError } = await (supabase as any)
         .from("order_items")
         .select("order_id, products!inner(seller_id)")
         .eq("products.seller_id", id);
@@ -561,7 +561,7 @@ export default function SellerDashboard() {
       const orderIds = Array.from(orderIdsSet);
       if (orderIds.length === 0) return [] as Order[];
 
-      const { data: filteredOrders, error: ordersError } = await supabase
+      const { data: filteredOrders, error: ordersError } = await (supabase as any)
         .from("orders")
         .select("*")
         .in("id", orderIds)
@@ -667,7 +667,7 @@ export default function SellerDashboard() {
     queryFn: async () => {
       const id = seller?.id || sellerId;
       if (!id) return [];
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("products")
         .select("id,name,description,price,image_url,stock_status,created_at,seller_name,seller_id,category_id")
         .eq("seller_id", id)
@@ -1068,7 +1068,7 @@ export default function SellerDashboard() {
 
   const deleteOrderMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("orders")
         .update({ seller_deleted: true, seller_deleted_at: new Date().toISOString() } as any)
         .eq("id", id);
@@ -1088,7 +1088,7 @@ export default function SellerDashboard() {
     mutationFn: async (id: string) => {
       const activeSellerId = seller?.id || sellerId;
       if (!activeSellerId) throw new Error("Seller not detected");
-      const { error } = await supabase.from("products").delete().eq("id", id).eq("seller_id", activeSellerId);
+      const { error } = await (supabase as any).from("products").delete().eq("id", id).eq("seller_id", activeSellerId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -2615,8 +2615,8 @@ export default function SellerDashboard() {
                 {categories.map((category) => (
                   <div key={category.id} className="p-4 bg-card rounded-xl border border-border/50">
                     <div className="flex items-start gap-4">
-                      {category.image_url && (
-                        <img src={category.image_url} alt={category.name} className="w-20 h-20 object-cover rounded-lg" />
+                      {Boolean((category as any).image_url) && (
+                        <img src={(category as any).image_url} alt={category.name} className="w-20 h-20 object-cover rounded-lg" />
                       )}
                       <div className="flex-1">
                         <div className="flex items-center justify-between">

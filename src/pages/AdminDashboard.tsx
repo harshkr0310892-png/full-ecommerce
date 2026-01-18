@@ -401,7 +401,7 @@ export default function AdminDashboard() {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data as Order[];
+      return (data as unknown) as Order[];
     },
   });
 
@@ -583,7 +583,7 @@ export default function AdminDashboard() {
         .from('seller_review_summary' as any)
         .select('seller_id, seller_name, seller_email, product_count, review_count, avg_rating, best_product_id, best_product_name, best_product_avg_rating, best_product_review_count');
       if (error) throw error;
-      return (data || []) as SellerReviewSummaryRow[];
+      return (data as unknown as SellerReviewSummaryRow[]) || [];
     },
   });
 

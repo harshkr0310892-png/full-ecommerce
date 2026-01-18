@@ -127,9 +127,10 @@ export default function Checkout() {
         .in("id", variantIds);
       if (!active) return;
       if (error) return;
+      const variants = (data as any[]) || [];
       const map: Record<string, string[]> = {};
-      const found = new Set((data || []).map((v: any) => v.id));
-      (data || []).forEach((v: any) => {
+      const found = new Set(variants.map((v: any) => v.id));
+      variants.forEach((v: any) => {
         map[v.id] = Array.isArray(v.image_urls) ? v.image_urls : [];
       });
       setVariantImages(map);
@@ -138,7 +139,7 @@ export default function Checkout() {
         const vid = it?.variant_info?.variant_id;
         if (!vid) return false;
         if (!found.has(vid)) return true;
-        const v = (data || []).find((x: any) => x.id === vid);
+        const v = variants.find((x: any) => x.id === vid);
         if (v && v.is_available === false) return true;
         const stockQty = v?.stock_quantity === null || v?.stock_quantity === undefined ? null : Number(v.stock_quantity);
         if (stockQty !== null && (stockQty <= 0 || stockQty < Number(it.quantity || 0))) return true;
@@ -298,6 +299,21 @@ export default function Checkout() {
   const shippingCharge = subtotal < 300 ? 40 : 0;
 
   const total = subtotalAfterCoupon + gstAmount + shippingCharge;
+  const codMaxTotal = 8000;
+  const codEligibleByItems = items.every((it) => it.cash_on_delivery === true);
+  const codEligibleByTotal = total <= codMaxTotal;
+  const codEligible = codEligibleByItems && codEligibleByTotal;
+
+  React.useEffect(() => {
+    if (paymentMethod !== 'cod') return;
+    if (codEligible) return;
+    setPaymentMethod('online');
+    if (!codEligibleByItems) {
+      toast.error('Cash on Delivery is not available for some items in your cart.');
+      return;
+    }
+    toast.error(`Cash on Delivery is not available for orders above ₹${codMaxTotal}. Please use online payment.`);
+  }, [codEligible, codEligibleByItems, codMaxTotal, paymentMethod]);
 
   const validateDeliveryStep = () => {
     if (!formData.name || !formData.phone || !formData.address) {
@@ -533,9 +549,12 @@ export default function Checkout() {
     }
 
     // Ensure COD is eligible for all items when selected
-    const codEligible = items.every((it) => it.cash_on_delivery === true);
-    if (paymentMethod === 'cod' && !codEligible) {
+    if (paymentMethod === 'cod' && !codEligibleByItems) {
       toast.error('Cash on Delivery is not available for some items in your cart.');
+      return;
+    }
+    if (paymentMethod === 'cod' && !codEligibleByTotal) {
+      toast.error(`Cash on Delivery is not available for orders above ₹${codMaxTotal}. Please use online payment.`);
       return;
     }
 
@@ -600,12 +619,13 @@ export default function Checkout() {
           .select("id,is_available,stock_quantity")
           .in("id", variantIds);
         if (variantsError) throw variantsError;
-        const found = new Set((variantsData || []).map((v: any) => v.id));
+        const variants = (variantsData as any[]) || [];
+        const found = new Set(variants.map((v: any) => v.id));
         const invalid = items.filter((it: any) => {
           const vid = it?.variant_info?.variant_id;
           if (!vid) return false;
           if (!found.has(vid)) return true;
-          const v = (variantsData || []).find((x: any) => x.id === vid);
+          const v = variants.find((x: any) => x.id === vid);
           if (v && v.is_available === false) return true;
           const stockQty = v?.stock_quantity === null || v?.stock_quantity === undefined ? null : Number(v.stock_quantity);
           if (stockQty !== null && (stockQty <= 0 || stockQty < Number(it.quantity || 0))) return true;
@@ -1616,14 +1636,19 @@ export default function Checkout() {
                           value="cod"
                           checked={paymentMethod === 'cod'}
                           onChange={() => setPaymentMethod('cod')}
-                          disabled={!items.every((it) => it.cash_on_delivery === true)}
+                          disabled={!codEligible}
                           className="accent-primary"
                         />
                         <span className="text-sm md:text-base">Cash on Delivery (Only for eligible products)</span>
                       </label>
-                      {!items.every((it) => it.cash_on_delivery === true) && (
+                      {!codEligibleByItems && (
                         <p className="text-xs md:text-sm text-muted-foreground">
                           Cash on Delivery is not available for some items in your cart.
+                        </p>
+                      )}
+                      {codEligibleByItems && !codEligibleByTotal && (
+                        <p className="text-xs md:text-sm text-muted-foreground">
+                          Cash on Delivery is not available for orders above ₹{codMaxTotal}. Please use online payment.
                         </p>
                       )}
                     </div>
