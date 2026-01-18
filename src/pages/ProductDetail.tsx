@@ -598,7 +598,7 @@ export default function ProductDetail() {
       return;
     }
     
-    const displayImage = (product.images && product.images.length > 0) ? product.images[0] : product.image_url;
+    const displayImage = allImages.length > 0 ? allImages[0] : null;
     const finalPrice = selectedVariant ? selectedVariant.price : Number(product.price);
     
     for (let i = 0; i < quantity; i++) {
@@ -638,7 +638,7 @@ export default function ProductDetail() {
       return;
     }
     
-    const displayImage = (product.images && product.images.length > 0) ? product.images[0] : product.image_url;
+    const displayImage = allImages.length > 0 ? allImages[0] : null;
     const finalPrice = selectedVariant ? selectedVariant.price : Number(product.price);
     
     if (isWishlisted) {
@@ -714,6 +714,26 @@ export default function ProductDetail() {
       ? product.images 
       : (product?.image_url ? [product.image_url] : []);
   })();
+
+  useEffect(() => {
+    if (!product) return;
+    if (!isWishlisted) return;
+    if (!selectedVariant) return;
+    const displayImage = allImages.length > 0 ? allImages[0] : null;
+    addToWishlist({
+      id: product.id,
+      name: product.name,
+      price: selectedVariant.price,
+      discount_percentage: 0,
+      image_url: displayImage,
+      variant_info: {
+        variant_id: selectedVariant.id,
+        attribute_name: selectedVariant.attribute_name,
+        attribute_value: selectedVariant.value_name,
+      },
+      cash_on_delivery: (product as any).cash_on_delivery || false,
+    });
+  }, [addToWishlist, allImages, isWishlisted, product, selectedVariant]);
 
   const nextImage = () => {
     if (!allImages.length) return;

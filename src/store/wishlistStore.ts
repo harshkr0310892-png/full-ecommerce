@@ -38,10 +38,10 @@ export const useWishlistStore = create<WishlistStore>()(
           // Check if item already exists in wishlist
           const exists = state.items.some((i) => i.id === item.id);
           if (exists) {
-            // If it exists, just make sure the animation flag is cleared
+            // If it exists, update stored data (variant/image/price) without re-adding
             return {
               items: state.items.map((i) =>
-                i.id === item.id ? { ...i, isNewlyAdded: false } : i
+                i.id === item.id ? { ...i, ...item, isNewlyAdded: false } : i
               ),
             };
           }

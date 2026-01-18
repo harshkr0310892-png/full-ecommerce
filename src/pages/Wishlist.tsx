@@ -193,6 +193,11 @@ export default function Wishlist() {
                   <h3 className="font-display text-sm font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
                     {item.name}
                   </h3>
+                  {item.variant_info?.attribute_name && item.variant_info?.attribute_value && (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {item.variant_info.attribute_name}: {item.variant_info.attribute_value}
+                    </div>
+                  )}
                   
                   <div className="mt-2 flex items-center gap-2">
                     {item.discount_percentage > 0 ? (
