@@ -1900,6 +1900,21 @@ const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, 
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [imageError, setImageError] = useState("");
+  const [step, setStep] = useState<"form" | "otp">("form");
+  const [otp, setOtp] = useState("");
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpResendLoading, setOtpResendLoading] = useState(false);
+  const [nextResendAt, setNextResendAt] = useState<number | null>(null);
+  
+  useEffect(() => {
+    if (!open) {
+      setStep("form");
+      setOtp("");
+      setNextResendAt(null);
+      setShowProfileAlert(false);
+      setImageError("");
+    }
+  }, [open]);
   
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -1938,15 +1953,15 @@ const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, 
     }
   };
   
-  const handleRequestReturn = async () => {
+  const requestReturnOtp = async (action: "request" | "resend") => {
     if (!profile?.full_name || !profile.phone || !profile.address) {
       setShowProfileAlert(true);
-      return;
+      return false;
     }
     
     if (images.length < 2 || images.length > 6) {
       setImageError('Please upload between 2 and 6 images');
-      return;
+      return false;
     }
 
     const orderDate = new Date(order.created_at);
@@ -1955,17 +1970,76 @@ const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, 
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays > 7) {
-      alert("Cannot return order. Order is older than 7 days.");
-      return;
+      toast.error("Cannot return order. Order is older than 7 days.");
+      return false;
     }
     
+    try {
+      if (action === "request") setOtpLoading(true);
+      else setOtpResendLoading(true);
+
+      if (action === "resend" && nextResendAt && Date.now() < nextResendAt) {
+        toast.error("Please wait before resending OTP.");
+        return false;
+      }
+
+      const { data, error } = await supabase.functions.invoke("return-otp", {
+        body: { action, order_id: order.id },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+
+      setStep("otp");
+      setNextResendAt(Date.now() + 10_000);
+      toast.success("OTP sent to your email.");
+      return true;
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to send OTP");
+      return false;
+    } finally {
+      setOtpLoading(false);
+      setOtpResendLoading(false);
+    }
+  };
+
+  const handleRequestReturn = async () => {
+    await requestReturnOtp("request");
+  };
+
+  const confirmOtpAndSubmitReturn = async () => {
+    if (!/^\d{6}$/.test(otp.trim())) {
+      toast.error("Please enter 6 digit OTP.");
+      return;
+    }
+
     setLoading(true);
     try {
+      const { data: verifyData, error: verifyError } = await supabase.functions.invoke("return-otp", {
+        body: { action: "verify", order_id: order.id, otp: otp.trim() },
+      });
+      if (verifyError) throw verifyError;
+      if ((verifyData as any)?.error) throw new Error((verifyData as any).error);
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session?.access_token) {
+        throw new Error("Session expired. Please login again.");
+      }
+      if (typeof sessionData.session.expires_at === "number" && sessionData.session.expires_at * 1000 < Date.now() + 60_000) {
+        await supabase.auth.refreshSession().catch(() => null);
+      }
+
       const imageUrls: string[] = [];
       
       for (let i = 0; i < images.length; i++) {
         const file = images[i];
-        const fileName = `${order.id}-return-${Date.now()}-${i}-${file.name}`;
+        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const base = file.name
+          .replace(/\.[^/.]+$/, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 40) || 'image';
+        const fileName = `${order.id}/${Date.now()}_${i}_${base}.${ext}`;
         
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('return-images')
@@ -2010,10 +2084,15 @@ const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, 
       toast.success('Return request submitted successfully!');
       setOpen(false);
       setReason("");
+      setOtherReason("");
+      setImages([]);
+      setImagePreviews([]);
+      setOtp("");
+      setStep("form");
       onReturnRequest();
     } catch (error: any) {
       console.error('Error requesting return:', error);
-      toast.error('Failed to submit return request');
+      toast.error(error?.message || 'Failed to submit return request');
     } finally {
       setLoading(false);
     }
@@ -2052,93 +2131,126 @@ const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, 
           )}
 
           <div className="space-y-5">
-            <div>
-              <Label className="text-amber-400/80 text-sm mb-2 block">Return Reason</Label>
-              <Select value={reason} onValueChange={setReason}>
-                <SelectTrigger className="royal-input">
-                  <SelectValue placeholder="Select a reason" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Wrong Size">Wrong Size</SelectItem>
-                  <SelectItem value="Damaged Product">Damaged Product</SelectItem>
-                  <SelectItem value="Not As Described">Not As Described</SelectItem>
-                  <SelectItem value="Changed Mind">Changed Mind</SelectItem>
-                  <SelectItem value="Quality Issues">Quality Issues</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {reason === 'Other' && (
-              <div>
-                <Label className="text-amber-400/80 text-sm mb-2 block">Please specify</Label>
-                <textarea
-                  placeholder="Enter your reason here..."
-                  value={otherReason}
-                  onChange={(e) => setOtherReason(e.target.value)}
-                  className="royal-input w-full px-4 py-3 rounded-lg resize-none"
-                  rows={3}
+            {step === "form" ? (
+              <>
+                <div>
+                  <Label className="text-amber-400/80 text-sm mb-2 block">Return Reason</Label>
+                  <Select value={reason} onValueChange={setReason}>
+                    <SelectTrigger className="royal-input">
+                      <SelectValue placeholder="Select a reason" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Wrong Size">Wrong Size</SelectItem>
+                      <SelectItem value="Damaged Product">Damaged Product</SelectItem>
+                      <SelectItem value="Not As Described">Not As Described</SelectItem>
+                      <SelectItem value="Changed Mind">Changed Mind</SelectItem>
+                      <SelectItem value="Quality Issues">Quality Issues</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {reason === 'Other' && (
+                  <div>
+                    <Label className="text-amber-400/80 text-sm mb-2 block">Please specify</Label>
+                    <textarea
+                      placeholder="Enter your reason here..."
+                      value={otherReason}
+                      onChange={(e) => setOtherReason(e.target.value)}
+                      className="royal-input w-full px-4 py-3 rounded-lg resize-none"
+                      rows={3}
+                    />
+                  </div>
+                )}
+                
+                <div>
+                  <Label className="text-amber-400/80 text-sm mb-2 block">
+                    Upload Images (minimum 2, maximum 6)
+                  </Label>
+                  <div 
+                    className="border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer hover:border-amber-400/50"
+                    style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }}
+                    onClick={() => document.getElementById(`return-image-upload-${order.id}`)?.click()}
+                  >
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                      id={`return-image-upload-${order.id}`}
+                    />
+                    <Camera className="w-10 h-10 text-amber-400/40 mx-auto mb-2" />
+                    <p className="text-gray-400 text-sm">
+                      Click to upload images or drag and drop
+                    </p>
+                    <p className="text-gray-500 text-xs mt-1">
+                      PNG, JPG, GIF up to 5MB
+                    </p>
+                  </div>
+                  
+                  {imageError && (
+                    <p className="text-red-400 text-sm mt-2">{imageError}</p>
+                  )}
+                  
+                  {imagePreviews.length > 0 && (
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                      {imagePreviews.map((preview, index) => (
+                        <div key={index} className="relative group">
+                          <img 
+                            src={preview} 
+                            alt={`Preview ${index + 1}`} 
+                            className="w-full h-20 object-cover rounded-lg border border-amber-400/20"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index)}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <p className="text-gray-500 text-xs mt-2">
+                    {images.length}/6 images uploaded
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-3">
+                <div className="text-sm text-gray-300">
+                  Please enter the 6-digit OTP sent to your email to confirm the return.
+                </div>
+                <Input
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  inputMode="numeric"
+                  pattern="\\d*"
+                  maxLength={6}
+                  className="royal-input"
+                  placeholder="Enter OTP"
                 />
+                <div className="flex gap-2">
+                  <button
+                    className="royal-btn-outline px-3 py-2 rounded-lg text-xs"
+                    onClick={() => requestReturnOtp("resend")}
+                    disabled={otpResendLoading || (nextResendAt !== null && Date.now() < nextResendAt)}
+                  >
+                    {otpResendLoading ? "Resending..." : "Resend OTP"}
+                  </button>
+                  <button
+                    className="royal-btn-outline px-3 py-2 rounded-lg text-xs"
+                    onClick={() => setStep("form")}
+                    disabled={loading}
+                  >
+                    Back
+                  </button>
+                </div>
               </div>
             )}
-            
-            {/* Image Upload Section */}
-            <div>
-              <Label className="text-amber-400/80 text-sm mb-2 block">
-                Upload Images (minimum 2, maximum 6)
-              </Label>
-              <div 
-                className="border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer hover:border-amber-400/50"
-                style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }}
-                onClick={() => document.getElementById(`return-image-upload-${order.id}`)?.click()}
-              >
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="hidden"
-                  id={`return-image-upload-${order.id}`}
-                />
-                <Camera className="w-10 h-10 text-amber-400/40 mx-auto mb-2" />
-                <p className="text-gray-400 text-sm">
-                  Click to upload images or drag and drop
-                </p>
-                <p className="text-gray-500 text-xs mt-1">
-                  PNG, JPG, GIF up to 5MB
-                </p>
-              </div>
-              
-              {imageError && (
-                <p className="text-red-400 text-sm mt-2">{imageError}</p>
-              )}
-              
-              {/* Preview images */}
-              {imagePreviews.length > 0 && (
-                <div className="mt-4 grid grid-cols-3 gap-2">
-                  {imagePreviews.map((preview, index) => (
-                    <div key={index} className="relative group">
-                      <img 
-                        src={preview} 
-                        alt={`Preview ${index + 1}`} 
-                        className="w-full h-20 object-cover rounded-lg border border-amber-400/20"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(index)}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              <p className="text-gray-500 text-xs mt-2">
-                {images.length}/6 images uploaded
-              </p>
-            </div>
           </div>
           
           <DialogFooter className="gap-3 mt-6">
@@ -2150,11 +2262,11 @@ const ReturnOrderButton = ({ order, profile, onReturnRequest }: { order: Order, 
             </button>
             <button 
               className="royal-btn px-4 py-2 rounded-lg flex items-center gap-2"
-              onClick={handleRequestReturn} 
-              disabled={loading}
+              onClick={step === "form" ? handleRequestReturn : confirmOtpAndSubmitReturn} 
+              disabled={loading || otpLoading}
             >
               {loading ? <div className="w-4 h-4 royal-spinner"></div> : null}
-              Submit Return
+              {step === "form" ? (otpLoading ? "Sending OTP..." : "Submit Return") : "Confirm OTP & Submit"}
             </button>
           </DialogFooter>
         </DialogContent>
