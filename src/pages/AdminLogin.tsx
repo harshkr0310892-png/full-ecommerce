@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Crown, Lock, User, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 // Fixed admin credentials
 const ADMIN_USERNAME = "harsh";
@@ -14,11 +15,14 @@ const ADMIN_PASSWORD = "harsh.kr1025";
 export default function AdminLogin() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [step, setStep] = useState<"credentials" | "otp">("credentials");
   const [credentials, setCredentials] = useState({
     username: '',
     password: '',
   });
   const [errors, setErrors] = useState<{ username?: string; password?: string }>({});
+  const [otp, setOtp] = useState("");
+  const [otpLoading, setOtpLoading] = useState(false);
 
   // Check if already logged in via session
   useEffect(() => {
@@ -27,6 +31,40 @@ export default function AdminLogin() {
       navigate('/admin/dashboard');
     }
   }, [navigate]);
+
+  const sendOtp = async () => {
+    setOtpLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-login-otp", {
+        body: { action: "request" },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success("OTP sent to admin email");
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to send OTP");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const verifyOtp = async () => {
+    setOtpLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-login-otp", {
+        body: { action: "verify", otp: otp.trim() },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      sessionStorage.setItem('admin_logged_in', 'true');
+      toast.success('Welcome back, Admin!');
+      navigate('/admin/dashboard');
+    } catch (err: any) {
+      toast.error(err?.message ?? "Invalid OTP");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,6 +80,15 @@ export default function AdminLogin() {
       return;
     }
 
+    if (step === "otp") {
+      if (otp.trim().length < 4) {
+        toast.error("Please enter the OTP");
+        return;
+      }
+      await verifyOtp();
+      return;
+    }
+
     setIsLoading(true);
 
     // Simulate a small delay for UX
@@ -49,9 +96,9 @@ export default function AdminLogin() {
 
     // Check fixed credentials
     if (credentials.username === ADMIN_USERNAME && credentials.password === ADMIN_PASSWORD) {
-      sessionStorage.setItem('admin_logged_in', 'true');
-      toast.success('Welcome back, Admin!');
-      navigate('/admin/dashboard');
+      setStep("otp");
+      setOtp("");
+      await sendOtp();
     } else {
       toast.error('Invalid username or password');
     }
@@ -81,39 +128,94 @@ export default function AdminLogin() {
 
           <form onSubmit={handleSubmit} className="bg-card rounded-2xl border border-border/50 p-8 royal-shadow">
             <div className="space-y-5">
-              <div>
-                <Label htmlFor="username">Username</Label>
-                <div className="relative mt-1">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="username"
-                    type="text"
-                    value={credentials.username}
-                    onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
-                    placeholder="Enter username"
-                    className="pl-11"
-                    autoComplete="username"
-                  />
-                </div>
-                {errors.username && <p className="text-sm text-destructive mt-1">{errors.username}</p>}
-              </div>
+              {step === "credentials" ? (
+                <>
+                  <div>
+                    <Label htmlFor="username">Username</Label>
+                    <div className="relative mt-1">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <Input
+                        id="username"
+                        type="text"
+                        value={credentials.username}
+                        onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
+                        placeholder="Enter username"
+                        className="pl-11"
+                        autoComplete="username"
+                        disabled={isLoading || otpLoading}
+                      />
+                    </div>
+                    {errors.username && <p className="text-sm text-destructive mt-1">{errors.username}</p>}
+                  </div>
 
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <div className="relative mt-1">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type="password"
-                    value={credentials.password}
-                    onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
-                    placeholder="Enter password"
-                    className="pl-11"
-                    autoComplete="current-password"
-                  />
-                </div>
-                {errors.password && <p className="text-sm text-destructive mt-1">{errors.password}</p>}
-              </div>
+                  <div>
+                    <Label htmlFor="password">Password</Label>
+                    <div className="relative mt-1">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <Input
+                        id="password"
+                        type="password"
+                        value={credentials.password}
+                        onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
+                        placeholder="Enter password"
+                        className="pl-11"
+                        autoComplete="current-password"
+                        disabled={isLoading || otpLoading}
+                      />
+                    </div>
+                    {errors.password && <p className="text-sm text-destructive mt-1">{errors.password}</p>}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <Label htmlFor="otp">Email OTP</Label>
+                    <Input
+                      id="otp"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      placeholder="Enter OTP"
+                      className="mt-1"
+                      inputMode="numeric"
+                      disabled={otpLoading}
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      OTP is sent to the configured admin email.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="royalOutline"
+                      className="w-1/2"
+                      onClick={() => {
+                        setStep("credentials");
+                        setOtp("");
+                      }}
+                      disabled={otpLoading}
+                    >
+                      Back
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="royalOutline"
+                      className="w-1/2"
+                      onClick={sendOtp}
+                      disabled={otpLoading}
+                    >
+                      {otpLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        "Resend OTP"
+                      )}
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
 
             <Button
@@ -121,15 +223,15 @@ export default function AdminLogin() {
               variant="royal"
               size="lg"
               className="w-full mt-8"
-              disabled={isLoading}
+              disabled={isLoading || otpLoading}
             >
-              {isLoading ? (
+              {(isLoading || otpLoading) ? (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Signing in...
+                  {step === "credentials" ? "Signing in..." : "Verifying..."}
                 </>
               ) : (
-                'Sign In'
+                step === "credentials" ? 'Sign In' : "Verify OTP"
               )}
             </Button>
 
