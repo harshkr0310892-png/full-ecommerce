@@ -22,6 +22,37 @@ function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+async function hmacSha256Hex(secret: string, input: string) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(sig), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function timingSafeEqualHex(a: string, b: string) {
+  const aa = a.toLowerCase();
+  const bb = b.toLowerCase();
+  if (aa.length !== bb.length) return false;
+  let out = 0;
+  for (let i = 0; i < aa.length; i++) out |= aa.charCodeAt(i) ^ bb.charCodeAt(i);
+  return out === 0;
+}
+
+function signatureBaseFromBody(body: any) {
+  const event = (body?.event ?? "").toString();
+  const orderId = (body?.order_id ?? body?.order_uuid ?? body?.id ?? "").toString();
+  const newStatus = (body?.new_status ?? body?.status ?? "").toString();
+  const oldStatus = (body?.old_status ?? "").toString();
+  const message = (body?.message ?? body?.note ?? "").toString();
+  const actorEmail = normalizeEmail(body?.actor_email) ?? "";
+  return [event, orderId, oldStatus, newStatus, message, actorEmail].join("\n");
+}
+
 function formatStatus(status: string | null | undefined) {
   const s = (status ?? "").toString().trim().toLowerCase();
   if (!s) return "updated";
@@ -189,16 +220,27 @@ Deno.serve(async (req: Request) => {
     const RESEND_FROM = Deno.env.get("RESEND_FROM") ?? "no-reply@example.com";
     const TRACK_BASE_URL = Deno.env.get("TRACK_BASE_URL") ?? "";
     const ALLOW_LOOKUP_BY_PUBLIC_ORDER_ID = (Deno.env.get("ALLOW_LOOKUP_BY_PUBLIC_ORDER_ID") ?? "").toLowerCase() === "true";
+    const WEBHOOK_SECRET = Deno.env.get("ORDER_NOTIFIER_WEBHOOK_SECRET") ?? "";
 
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return json({ error: "Missing Supabase service role configuration" }, { status: 500 });
     }
 
-    const body = await req.json().catch(() => null);
+    const raw = await req.text().catch(() => "");
+    const body = raw ? JSON.parse(raw) : null;
     const event = (body?.event ?? "manual").toString();
     const rawOrderId = (body?.order_id ?? body?.order_uuid ?? body?.id ?? "").toString().trim();
 
     if (!rawOrderId) return json({ error: "Missing order_id" }, { status: 400 });
+
+    if (WEBHOOK_SECRET) {
+      const sigHeader = req.headers.get("x-order-notifier-signature") ?? "";
+      const provided = sigHeader.startsWith("sha256=") ? sigHeader.slice("sha256=".length) : sigHeader;
+      const expected = await hmacSha256Hex(WEBHOOK_SECRET, signatureBaseFromBody(body));
+      if (!provided || !timingSafeEqualHex(provided, expected)) {
+        return json({ error: "Unauthorized" }, { status: 401 });
+      }
+    }
 
     const lookupByUuid = isUuid(rawOrderId);
     if (!lookupByUuid && !ALLOW_LOOKUP_BY_PUBLIC_ORDER_ID) {
