@@ -151,7 +151,7 @@ function isValidUuid(value: string) {
 async function sendEmailOtp(params: { resendApiKey: string; from: string; to: string; otp: string; orderPublicId: string; appName: string }) {
   const { resendApiKey, from, to, otp, orderPublicId, appName } = params;
   const subject = `${appName} Return OTP: ${otp}`;
-  const html = const html = `
+  const html = `
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
       .wrap{font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;line-height:1.6;background:linear-gradient(180deg,#dbeafe 0%,#e0f2fe 50%,#f0f9ff 100%);padding:32px 18px;min-height:100vh}
