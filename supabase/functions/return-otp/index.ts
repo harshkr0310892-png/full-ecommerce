@@ -151,31 +151,64 @@ function isValidUuid(value: string) {
 async function sendEmailOtp(params: { resendApiKey: string; from: string; to: string; otp: string; orderPublicId: string; appName: string }) {
   const { resendApiKey, from, to, otp, orderPublicId, appName } = params;
   const subject = `${appName} Return OTP: ${otp}`;
-  const html = `
+  const html = const html = `
     <style>
-      .wrap{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;line-height:1.4;background:#f6f7fb;padding:18px}
-      .card{max-width:520px;margin:0 auto;background:#ffffff;border:1px solid #e9eaf1;border-radius:14px;overflow:hidden}
-      .header{padding:16px 18px;background:#111827;color:#fff}
-      .title{margin:0;font-size:16px;font-weight:700}
-      .body{padding:18px}
-      .p{margin:0 0 10px 0;color:#111827}
-      .muted{color:#6b7280}
-      .otp{font-size:28px;letter-spacing:6px;font-weight:800;margin:12px 0;color:#111827}
-      .badge{display:inline-block;padding:2px 10px;border-radius:999px;background:#f59e0b;color:#111827;font-weight:700;font-size:12px}
-      .footer{padding:14px 18px;border-top:1px solid #eef0f6;color:#6b7280;font-size:12px}
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+      .wrap{font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;line-height:1.6;background:linear-gradient(180deg,#dbeafe 0%,#e0f2fe 50%,#f0f9ff 100%);padding:32px 18px;min-height:100vh}
+      .card{max-width:480px;margin:0 auto;background:#ffffff;border:none;border-radius:20px;overflow:hidden;box-shadow:0 10px 40px rgba(14,165,233,0.2),0 2px 10px rgba(0,0,0,0.05)}
+      .header{padding:28px 24px;background:linear-gradient(135deg,#1e40af 0%,#3b82f6 50%,#0ea5e9 100%);text-align:center}
+      .logo{width:48px;height:48px;background:rgba(255,255,255,0.2);border-radius:12px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center}
+      .logo-icon{font-size:24px}
+      .title{margin:0;font-size:22px;font-weight:800;letter-spacing:-0.5px;color:#ffffff;text-shadow:0 2px 4px rgba(0,0,0,0.1)}
+      .subtitle{margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.85);font-weight:500}
+      .body{padding:32px 24px;text-align:center;background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%)}
+      .icon-box{width:64px;height:64px;background:linear-gradient(135deg,#dbeafe,#e0f2fe);border-radius:50%;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 15px rgba(59,130,246,0.2)}
+      .icon-box span{font-size:28px}
+      .p{margin:0 0 8px 0;color:#1e3a5f;font-size:15px;font-weight:500}
+      .muted{color:#64748b;font-size:14px;font-weight:400}
+      .order-row{margin:16px 0;padding:12px 16px;background:linear-gradient(90deg,#eff6ff,#f0f9ff);border-radius:10px;display:inline-block}
+      .badge{display:inline-block;padding:6px 14px;border-radius:8px;background:linear-gradient(135deg,#3b82f6,#0ea5e9);color:#ffffff;font-weight:700;font-size:13px;letter-spacing:0.5px;box-shadow:0 2px 8px rgba(59,130,246,0.3)}
+      .otp-container{margin:24px 0;padding:20px;background:linear-gradient(135deg,#1e40af 0%,#3b82f6 50%,#0ea5e9 100%);border-radius:16px;box-shadow:0 8px 25px rgba(59,130,246,0.35)}
+      .otp-label{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:rgba(255,255,255,0.8);margin-bottom:8px;font-weight:600}
+      .otp{font-size:36px;letter-spacing:10px;font-weight:800;color:#ffffff;text-shadow:0 2px 4px rgba(0,0,0,0.15);margin:0}
+      .timer{margin-top:20px;padding:10px 18px;background:#fef3c7;border-radius:8px;display:inline-block}
+      .timer-text{color:#92400e;font-size:13px;font-weight:600}
+      .timer-text span{color:#d97706}
+      .warning{margin-top:16px;padding:12px;background:#fef2f2;border-radius:8px;border-left:3px solid #ef4444}
+      .warning-text{color:#991b1b;font-size:12px;font-weight:500;margin:0}
+      .footer{padding:20px 24px;background:#f1f5f9;text-align:center;border-top:1px solid #e2e8f0}
+      .footer-text{color:#64748b;font-size:12px;margin:0 0 8px}
+      .footer-brand{color:#3b82f6;font-size:13px;font-weight:700;margin:0}
     </style>
     <div class="wrap">
       <div class="card">
         <div class="header">
+          <div class="logo"><span class="logo-icon">🛒</span></div>
           <div class="title">${appName}</div>
+          <div class="subtitle">Secure Return Verification</div>
         </div>
         <div class="body">
-          <p class="p">Return confirm karne ke liye OTP:</p>
-          <p class="p muted">Order: <span class="badge">${orderPublicId}</span></p>
-          <div class="otp">${otp}</div>
-          <p class="p muted">OTP 10 minutes ke liye valid hai. Please kisi ko share mat karo.</p>
+          <div class="icon-box"><span>📦</span></div>
+          <p class="p">Return Request ke liye OTP</p>
+          <div class="order-row">
+            <span class="muted">Order ID: </span>
+            <span class="badge">${orderPublicId}</span>
+          </div>
+          <div class="otp-container">
+            <div class="otp-label">Your OTP Code</div>
+            <div class="otp">${otp}</div>
+          </div>
+          <div class="timer">
+            <span class="timer-text">⏱️ Valid for <span>10 minutes</span> only</span>
+          </div>
+          <div class="warning">
+            <p class="warning-text">🔒 Is OTP ko kisi ke saath share mat karo</p>
+          </div>
         </div>
-        <div class="footer">If you did not request this, ignore this email.</div>
+        <div class="footer">
+          <p class="footer-text">If you did not request this, please ignore this email.</p>
+          <p class="footer-brand">💙 ${appName}</p>
+        </div>
       </div>
     </div>
   `;
