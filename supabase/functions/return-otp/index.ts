@@ -151,68 +151,129 @@ function isValidUuid(value: string) {
 async function sendEmailOtp(params: { resendApiKey: string; from: string; to: string; otp: string; orderPublicId: string; appName: string }) {
   const { resendApiKey, from, to, otp, orderPublicId, appName } = params;
   const subject = `${appName} Return OTP: ${otp}`;
-  const html = `
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-      .wrap{font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;line-height:1.6;background:linear-gradient(180deg,#dbeafe 0%,#e0f2fe 50%,#f0f9ff 100%);padding:32px 18px;min-height:100vh}
-      .card{max-width:480px;margin:0 auto;background:#ffffff;border:none;border-radius:20px;overflow:hidden;box-shadow:0 10px 40px rgba(14,165,233,0.2),0 2px 10px rgba(0,0,0,0.05)}
-      .header{padding:28px 24px;background:linear-gradient(135deg,#1e40af 0%,#3b82f6 50%,#0ea5e9 100%);text-align:center}
-      .logo{width:48px;height:48px;background:rgba(255,255,255,0.2);border-radius:12px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center}
-      .logo-icon{font-size:24px}
-      .title{margin:0;font-size:22px;font-weight:800;letter-spacing:-0.5px;color:#ffffff;text-shadow:0 2px 4px rgba(0,0,0,0.1)}
-      .subtitle{margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.85);font-weight:500}
-      .body{padding:32px 24px;text-align:center;background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%)}
-      .icon-box{width:64px;height:64px;background:linear-gradient(135deg,#dbeafe,#e0f2fe);border-radius:50%;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 15px rgba(59,130,246,0.2)}
-      .icon-box span{font-size:28px}
-      .p{margin:0 0 8px 0;color:#1e3a5f;font-size:15px;font-weight:500}
-      .muted{color:#64748b;font-size:14px;font-weight:400}
-      .order-row{margin:16px 0;padding:12px 16px;background:linear-gradient(90deg,#eff6ff,#f0f9ff);border-radius:10px;display:inline-block}
-      .badge{display:inline-block;padding:6px 14px;border-radius:8px;background:linear-gradient(135deg,#3b82f6,#0ea5e9);color:#ffffff;font-weight:700;font-size:13px;letter-spacing:0.5px;box-shadow:0 2px 8px rgba(59,130,246,0.3)}
-      .otp-container{margin:24px 0;padding:20px;background:linear-gradient(135deg,#1e40af 0%,#3b82f6 50%,#0ea5e9 100%);border-radius:16px;box-shadow:0 8px 25px rgba(59,130,246,0.35)}
-      .otp-label{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:rgba(255,255,255,0.8);margin-bottom:8px;font-weight:600}
-      .otp{font-size:36px;letter-spacing:10px;font-weight:800;color:#ffffff;text-shadow:0 2px 4px rgba(0,0,0,0.15);margin:0}
-      .timer{margin-top:20px;padding:10px 18px;background:#fef3c7;border-radius:8px;display:inline-block}
-      .timer-text{color:#92400e;font-size:13px;font-weight:600}
-      .timer-text span{color:#d97706}
-      .warning{margin-top:16px;padding:12px;background:#fef2f2;border-radius:8px;border-left:3px solid #ef4444}
-      .warning-text{color:#991b1b;font-size:12px;font-weight:500;margin:0}
-      .footer{padding:20px 24px;background:#f1f5f9;text-align:center;border-top:1px solid #e2e8f0}
-      .footer-text{color:#64748b;font-size:12px;margin:0 0 8px}
-      .footer-brand{color:#3b82f6;font-size:13px;font-weight:700;margin:0}
-    </style>
-    <div class="wrap">
-      <div class="card">
-        <div class="header">
-          <div class="logo"><span class="logo-icon">🛒</span></div>
-          <div class="title">${appName}</div>
-          <div class="subtitle">Secure Return Verification</div>
-        </div>
-        <div class="body">
-          <div class="icon-box"><span>📦</span></div>
-          <p class="p">Return Request ke liye OTP</p>
-          <div class="order-row">
-            <span class="muted">Order ID: </span>
-            <span class="badge">${orderPublicId}</span>
-          </div>
-          <div class="otp-container">
-            <div class="otp-label">Your OTP Code</div>
-            <div class="otp">${otp}</div>
-          </div>
-          <div class="timer">
-            <span class="timer-text">⏱️ Valid for <span>10 minutes</span> only</span>
-          </div>
-          <div class="warning">
-            <p class="warning-text">🔒 Is OTP ko kisi ke saath share mat karo</p>
-          </div>
-        </div>
-        <div class="footer">
-          <p class="footer-text">If you did not request this, please ignore this email.</p>
-          <p class="footer-brand">💙 ${appName}</p>
-        </div>
-      </div>
-    </div>
-  `;
+  
+  const otpDigits = otp.split('').map(digit => `
+    <td style="width:48px;height:60px;background:linear-gradient(180deg,#1e3a8a 0%,#1e40af 100%);border-radius:12px;text-align:center;vertical-align:middle;margin:0 4px;box-shadow:0 4px 15px rgba(30,58,138,0.4),inset 0 1px 0 rgba(255,255,255,0.1);border:1px solid rgba(96,165,250,0.3);">
+      <span style="font-size:28px;font-weight:800;color:#ffffff;text-shadow:0 2px 4px rgba(0,0,0,0.2);font-family:'Segoe UI',Roboto,Arial,sans-serif;">${digit}</span>
+    </td>
+  `).join('<td style="width:8px;"></td>');
 
+const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${appName} - Return OTP</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    
+    body { margin:0; padding:0; background:#f8fafc; font-family:'Inter', system-ui, -apple-system, sans-serif; }
+    .container { max-width: 480px; margin: 32px auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08); border: 1px solid #e2e8f0; }
+    
+    .header { 
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
+      padding: 32px 40px; 
+      text-align: center; 
+      color: #ffffff;
+    }
+    .logo { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+    .subtitle { margin: 8px 0 0; font-size: 14px; opacity: 0.9; font-weight: 500; }
+
+    .body { padding: 40px 40px 32px; text-align: center; color: #1e293b; }
+    .greeting { font-size: 18px; font-weight: 600; margin: 0 0 20px; color: #0f172a; }
+    .message { font-size: 16px; line-height: 1.6; color: #475569; margin: 0 0 32px; }
+    
+    .otp-box {
+      background: #f1f5f9;
+      border: 2px dashed #0ea5e9;
+      border-radius: 16px;
+      padding: 24px 16px;
+      margin: 32px 0;
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: 8px;
+      color: #0f172a;
+      background: linear-gradient(white, white) padding-box,
+                  linear-gradient(135deg, #0ea5e9, #38bdf8) border-box;
+    }
+    
+    .order-badge {
+      display: inline-block;
+      background: #e0f2fe;
+      color: #0369a1;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin: 8px 0 24px;
+    }
+
+    .warning {
+      background: #fffbeb;
+      border: 1px solid #fef3c7;
+      color: #92400e;
+      padding: 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      margin: 32px 0;
+      line-height: 1.5;
+    }
+
+    .footer {
+      background: #f8fafc;
+      padding: 24px 40px;
+      text-align: center;
+      font-size: 13px;
+      color: #64748b;
+      border-top: 1px solid #e2e8f0;
+    }
+    .footer a { color: #0ea5e9; text-decoration: none; font-weight: 500; }
+
+    @media (max-width: 540px) {
+      .container { margin: 16px; border-radius: 14px; }
+      .header, .body, .footer { padding: 24px !important; }
+      .otp-box { font-size: 32px; letter-spacing: 6px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">${appName}</div>
+      <div class="subtitle">Return Request Verification</div>
+    </div>
+
+    <div class="body">
+      <h1 class="greeting">Here’s your Return OTP</h1>
+      <p class="message">
+        your order <strong>${orderPublicId}</strong> if you want to return it.<br />
+        To confirm, please use the OTP given below.
+      </p>
+
+      <div class="order-badge">Order ID: ${orderPublicId}</div>
+
+      <div class="otp-box">${otp}</div>
+
+      <div class="warning">
+        <strong>⚠️ This otp will expires in just 10 minute.</strong><br />
+        please keep it secure do not share it.
+      </div>
+
+      <p class="message" style="font-size:14px; color:#64748b;">
+        If you did not make this request, please ignore this email.
+      </p>
+    </div>
+
+    <div class="footer">
+      © ${new Date().getFullYear()} ${appName} • All rights reserved<br />
+      Need help? Contact <a href="mailto:store@cartlyfy.com">store@cartlyfy.com</a>
+    </div>
+  </div>
+</body>
+</html>
+`;
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
