@@ -30,7 +30,7 @@ const royalStyles = `
   :root {
     --royal-gold: linear-gradient(135deg, #D4AF37 0%, #FFD700 50%, #D4AF37 100%);
     --royal-purple: linear-gradient(135deg, #4A0E4E 0%, #2D0A31 50%, #1A0620 100%);
-    --royal-burgundy: linear-gradient(135deg, #722F37 0%, #4A1C20 100%);
+    --royal-burgundy: linear-gradient(135deg, #af313fff 0%, #4A1C20 100%);
     --royal-navy: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
     --premium-shadow: 0 10px 40px rgba(212, 175, 55, 0.15);
     --glass-bg: rgba(26, 26, 46, 0.85);
@@ -374,7 +374,15 @@ interface Order {
   return_request_date?: string | null;
   return_processed_date?: string | null;
   return_refund_amount?: number | null;
-  items?: { product_name: string; quantity: number; product_price: number; product_image?: string }[];
+  items?: {
+    product_name: string;
+    quantity: number;
+    product_price: number;
+    product_id?: string | null;
+    variant_info?: unknown;
+    product_image?: string;
+    variant_text?: string | null;
+  }[];
   messages?: {
     id: string;
     message: string;
@@ -524,27 +532,92 @@ export default function CustomerProfile() {
       return;
     }
 
+    const getVariantInfo = (raw: unknown) => {
+      if (!raw || typeof raw !== 'object') return null;
+      const obj = raw as Record<string, unknown>;
+      const variant_id = typeof obj.variant_id === 'string' ? obj.variant_id : null;
+      const attribute_name = typeof obj.attribute_name === 'string' ? obj.attribute_name : null;
+      const value_name = typeof obj.value_name === 'string' ? obj.value_name : null;
+      const attribute_value = typeof obj.attribute_value === 'string' ? obj.attribute_value : null;
+      const attribute = typeof obj.attribute === 'string' ? obj.attribute : null;
+      return { variant_id, attribute_name, value_name, attribute_value, attribute };
+    };
+
+    const getVariantText = (raw: unknown) => {
+      const vi = getVariantInfo(raw);
+      if (!vi) return null;
+      const name = vi.attribute_name || vi.attribute;
+      const value = vi.value_name || vi.attribute_value;
+      if (!name || !value) return null;
+      return `${name}: ${value}`;
+    };
+
+    const getFirstImageUrl = (raw: unknown): string | null => {
+      if (!raw) return null;
+      if (Array.isArray(raw)) {
+        const url = raw.find((x) => typeof x === 'string' && x.trim().length > 0);
+        return typeof url === 'string' ? url : null;
+      }
+      return null;
+    };
+
     const ordersWithDetails = await Promise.all(
       (data || []).map(async (order) => {
         const { data: items } = await supabase
           .from('order_items')
-          .select('product_name, quantity, product_price, product_id')
+          .select('product_name, quantity, product_price, product_id, variant_info')
           .eq('order_id', order.id);
-        
-        const itemsWithImages = await Promise.all(
-          (items || []).map(async (item) => {
-            const { data: product } = await supabase
-              .from('products')
-              .select('image_url')
-              .eq('id', item.product_id)
-              .single();
-            
-            return {
-              ...item,
-              product_image: product?.image_url
-            };
-          })
+
+        const productIds = Array.from(
+          new Set((items || []).map((i) => i.product_id).filter((id) => typeof id === 'string' && id.length > 0))
+        ) as string[];
+
+        const variantIds = Array.from(
+          new Set(
+            (items || [])
+              .map((i) => getVariantInfo((i as { variant_info?: unknown }).variant_info)?.variant_id)
+              .filter((id): id is string => typeof id === 'string' && id.length > 0)
+          )
         );
+
+        const [productsResp, variantsResp] = await Promise.all([
+          productIds.length > 0
+            ? supabase.from('products').select('id, image_url, images').in('id', productIds)
+            : Promise.resolve({ data: [], error: null } as unknown as { data: Array<{ id: string; image_url: string | null; images: unknown }>; error: any }),
+          variantIds.length > 0
+            ? (supabase.from('product_variants' as any) as any).select('id, image_urls').in('id', variantIds)
+            : Promise.resolve({ data: [], error: null } as unknown as { data: Array<{ id: string; image_urls: unknown }>; error: any }),
+        ]);
+
+        const productsMap = new Map<string, { image_url: string | null; images: unknown }>();
+        (productsResp.data || []).forEach((p) => {
+          const row = p as unknown as { id?: unknown; image_url?: unknown; images?: unknown };
+          if (typeof row.id !== 'string' || row.id.length === 0) return;
+          productsMap.set(row.id, {
+            image_url: typeof row.image_url === 'string' ? row.image_url : null,
+            images: row.images,
+          });
+        });
+
+        const variantImageMap = new Map<string, string>();
+        (variantsResp.data || []).forEach((v) => {
+          const row = v as unknown as { id?: unknown; image_urls?: unknown };
+          if (typeof row.id !== 'string' || row.id.length === 0) return;
+          const first = getFirstImageUrl(row.image_urls);
+          if (first) variantImageMap.set(row.id, first);
+        });
+
+        const itemsWithImages = (items || []).map((item) => {
+          const vi = getVariantInfo((item as { variant_info?: unknown }).variant_info);
+          const variantImage = vi?.variant_id ? variantImageMap.get(vi.variant_id) : null;
+          const productEntry = typeof item.product_id === 'string' ? productsMap.get(item.product_id) : undefined;
+          const productFallback = productEntry?.image_url || getFirstImageUrl(productEntry?.images);
+          return {
+            ...item,
+            product_image: variantImage || productFallback || undefined,
+            variant_text: getVariantText((item as { variant_info?: unknown }).variant_info),
+          };
+        });
         
         const { data: messages } = await supabase
           .from('order_messages')
@@ -1442,6 +1515,9 @@ export default function CustomerProfile() {
                                             <div className="min-w-0 flex-1">
                                               <p className="text-gray-200 font-medium truncate">{item.product_name}</p>
                                               <p className="text-gray-400 text-xs">Qty: {item.quantity}</p>
+                                              {item.variant_text && (
+                                                <p className="text-gray-400 text-xs truncate">{item.variant_text}</p>
+                                              )}
                                             </div>
                                             <div className="text-amber-400/80 font-medium">
                                               ₹{Number(item.product_price).toFixed(2)}
@@ -1508,6 +1584,9 @@ export default function CustomerProfile() {
                                             <div className="flex-1">
                                               <p className="text-gray-200 text-sm font-medium">{item.product_name}</p>
                                               <p className="text-gray-400 text-xs">Qty: {item.quantity}</p>
+                                              {item.variant_text && (
+                                                <p className="text-gray-400 text-xs">{item.variant_text}</p>
+                                              )}
                                             </div>
                                             <div className="text-amber-400/80 text-sm">
                                               ₹{Number(item.product_price).toFixed(2)}
