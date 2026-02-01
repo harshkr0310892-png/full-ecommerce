@@ -352,24 +352,24 @@ export default function Wishlist() {
                     )}
                   </div>
                   
-                  <div className="mt-3 flex gap-2">
+                  <div className="mt-3 flex flex-col sm:flex-row gap-2">
                     <Button 
                       size="sm" 
                       variant="outline" 
-                      className="flex-1 h-12 text-sm px-2 hover:bg-gradient-to-r hover:from-blue-500/20 hover:to-light-blue-500/20 hover:border-blue-500/50 transition-all duration-300"
+                      className="flex-1 h-10 sm:h-12 text-xs sm:text-sm px-2 hover:bg-gradient-to-r hover:from-blue-500/20 hover:to-light-blue-500/20 hover:border-blue-500/50 transition-all duration-300"
                       onClick={() => handleRemoveFromWishlist(item.id)}
                     >
-                      <X className="w-4 h-4 mr-1" />
+                      <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" />
                       Remove
                     </Button>
                     <Button 
                       size="sm" 
                       variant="royal" 
-                      className="flex-1 h-12 text-sm px-2"
+                      className="flex-1 h-10 sm:h-12 text-xs sm:text-sm px-2"
                       onClick={() => handleAddToCart(item)}
                       disabled={isUnavailable}
                     >
-                      <ShoppingCart className="w-4 h-4 mr-1" />
+                      <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" />
                       Add
                     </Button>
                   </div>
