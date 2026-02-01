@@ -409,6 +409,7 @@ export default function CustomerProfile() {
   const [activeTab, setActiveTab] = useState<'orders' | 'returns' | 'chatbot'>('orders');
   const [cancelOrderId, setCancelOrderId] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  const [cancellingReturns, setCancellingReturns] = useState<Record<string, boolean>>({});
   const [editForm, setEditForm] = useState({
     full_name: '',
     phone: '',
@@ -586,10 +587,58 @@ export default function CustomerProfile() {
 
       if (error) throw error;
 
-      setReturns(returnsData || []);
+      const visibleReturns = (returnsData || []).filter((ret) => ret.return_status !== 'cancelled');
+      setReturns(visibleReturns);
     } catch (error) {
       console.error('Error loading returns:', error);
       setReturns([]);
+    }
+  };
+
+  const handleCancelReturn = async (ret: any) => {
+    if (!ret?.id || ret.return_status !== 'requested') return;
+    setCancellingReturns(prev => ({ ...prev, [ret.id]: true }));
+    try {
+      const { error: updateError } = await supabase
+        .from('returns')
+        .update({ return_status: 'cancelled' })
+        .eq('id', ret.id)
+        .eq('return_status', 'requested');
+
+      if (updateError) throw updateError;
+
+      await supabase
+        .from('orders')
+        .update({
+          return_status: null,
+          return_reason: null,
+          return_request_date: null,
+          return_processed_date: null,
+          return_refund_amount: null
+        })
+        .eq('id', ret.order_id);
+
+      setReturns(prev => prev.filter((item) => item.id !== ret.id));
+      setOrders(prev =>
+        prev.map(order =>
+          order.id === ret.order_id
+            ? {
+                ...order,
+                return_status: null,
+                return_reason: null,
+                return_request_date: null,
+                return_processed_date: null,
+                return_refund_amount: null
+              }
+            : order
+        )
+      );
+      toast.success('Return request cancelled');
+    } catch (error) {
+      console.error('Error cancelling return:', error);
+      toast.error('Failed to cancel return');
+    } finally {
+      setCancellingReturns(prev => ({ ...prev, [ret.id]: false }));
     }
   };
 
@@ -1578,6 +1627,17 @@ export default function CustomerProfile() {
                                     <span className="text-amber-400/60">Refund Amount:</span>{' '}
                                     <span className="gold-text font-medium">₹{Number(ret.refund_amount).toFixed(2)}</span>
                                   </p>
+                                )}
+                                {ret.return_status === 'requested' && (
+                                  <div className="mt-4">
+                                    <button
+                                      className="royal-btn-outline px-3 py-2 rounded-lg text-xs"
+                                      onClick={() => handleCancelReturn(ret)}
+                                      disabled={!!cancellingReturns[ret.id]}
+                                    >
+                                      {cancellingReturns[ret.id] ? 'Cancelling...' : 'Cancel Return'}
+                                    </button>
+                                  </div>
                                 )}
                                 
                                 {/* Return Images */}

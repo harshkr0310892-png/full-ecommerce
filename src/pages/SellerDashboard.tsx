@@ -716,6 +716,7 @@ export default function SellerDashboard() {
         .from('returns')
         .select('*')
         .in('order_id', orderIds)
+        .neq('return_status', 'cancelled')
         .order('requested_at', { ascending: false });
       
       if (returnsError) {
