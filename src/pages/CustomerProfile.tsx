@@ -1843,8 +1843,15 @@ const ChatbotComponent = () => {
 
   const cleanAiText = (text: string) => {
     let t = text;
+    t = t.replace(/\r\n/g, '\n');
     t = t.replace(/```[a-zA-Z0-9_-]*\n([\s\S]*?)```/g, '$1');
     t = t.replace(/```/g, '');
+    t = t.replace(/^\s*#{1,6}\s+/gm, '');
+    t = t.replace(/^\s*>\s+/gm, '');
+    t = t.replace(/^\s*\*\s+/gm, '- ');
+    t = t.replace(/^\s*-\s+/gm, '- ');
+    t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1');
+    t = t.replace(/`([^`]+)`/g, '$1');
     t = t.replace(/\*\*/g, '');
     t = t.replace(/__/g, '');
     t = t.replace(/`/g, '');
