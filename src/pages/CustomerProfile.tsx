@@ -1841,6 +1841,16 @@ const ChatbotComponent = () => {
     return typeof text === 'string' && text.trim() ? text : null;
   };
 
+  const cleanAiText = (text: string) => {
+    let t = text;
+    t = t.replace(/```[a-zA-Z0-9_-]*\n([\s\S]*?)```/g, '$1');
+    t = t.replace(/```/g, '');
+    t = t.replace(/\*\*/g, '');
+    t = t.replace(/__/g, '');
+    t = t.replace(/`/g, '');
+    return t.trim();
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -1884,7 +1894,8 @@ const ChatbotComponent = () => {
 
       const data = await callCustomerProfileAi({ messages: apiMessages, model: "gemini-3-flash-preview", temperature: 0.1 });
 
-      const botResponse = extractGeminiText(data) || "Sorry, I couldn't process that. Please try again.";
+      const botResponseRaw = extractGeminiText(data) || "Sorry, I couldn't process that. Please try again.";
+      const botResponse = cleanAiText(botResponseRaw);
       
       const botMessage = {
         id: (Date.now() + 1).toString(),
@@ -1953,7 +1964,8 @@ const ChatbotComponent = () => {
 
       const data = await callCustomerProfileAi({ messages: apiMessages, model: "gemini-3-flash-preview", temperature: 0.1 });
 
-      const jokeResponse = extractGeminiText(data) || "Why did the computer go to the doctor? Because it caught a virus.";
+      const jokeResponseRaw = extractGeminiText(data) || "Why did the computer go to the doctor? Because it caught a virus.";
+      const jokeResponse = cleanAiText(jokeResponseRaw);
       
       const botMessage = {
         id: (Date.now() + 1).toString(),
