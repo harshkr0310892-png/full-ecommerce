@@ -1,8 +1,9 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import React, { ElementType } from "react";
 import SimpleTextReveal from "@/components/SimpleTextReveal";
 import Carousel from "@/components/Carousel";
 import { Layout } from "@/components/layout/Layout";
+import { SearchBar } from "@/components/SearchBar";
 import { Button } from "@/components/ui/button";
 import { ProductCard } from "@/components/products/ProductCard";
 import { BannerCarousel } from "@/components/home/BannerCarousel";
@@ -194,6 +195,7 @@ const StatBadge = ({ icon: Icon, label, value, color }: { icon: ElementType; lab
 );
 
 export default function Index() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(() => {
@@ -216,6 +218,12 @@ export default function Index() {
       window.removeEventListener('resize', checkIfMobile);
     };
   }, []);
+
+  const handleHomeSearch = (term: string) => {
+    const q = term.trim();
+    if (!q) return;
+    navigate(`/products?search=${encodeURIComponent(q)}`);
+  };
   
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -437,6 +445,21 @@ export default function Index() {
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
             <div className="w-8 h-12 rounded-full border-2 border-border flex items-start justify-center p-2">
               <div className="w-1.5 h-3 bg-primary rounded-full animate-pulse" />
+            </div>
+          </div>
+        </section>
+
+        {/* Sticky Search (Home) */}
+        <section className="sticky top-16 sm:top-20 z-40 py-3 bg-background/60 backdrop-blur border-b border-border/40">
+          <div className="container mx-auto px-4">
+            <div className="bg-card/80 border border-border rounded-2xl p-3">
+              <div className="flex justify-center">
+                <SearchBar
+                  onSearch={handleHomeSearch}
+                  placeholder="Search products..."
+                  context="collection"
+                />
+              </div>
             </div>
           </div>
         </section>

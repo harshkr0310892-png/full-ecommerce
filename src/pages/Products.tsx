@@ -103,10 +103,12 @@ const styles = `
   .scroll-container {
     scrollbar-width: none;
     -ms-overflow-style: none;
+    scrollbar-color: transparent transparent;
   }
 
   .scroll-container::-webkit-scrollbar {
-    display: none;
+    width: 0px;
+    height: 0px;
   }
 
   .scroll-button {
@@ -571,14 +573,23 @@ export default function Products() {
           {/* Category Strip Section */}
           <div ref={categoryStickyRef} className="mb-8 sticky top-16 sm:top-20 z-40">
             <div className={`category-strip ${categoryStuck ? 'p-2.5 sm:p-3' : 'p-3 sm:p-4'}`}>
-              <div className={`flex items-center justify-between ${categoryStuck ? 'mb-2' : 'mb-4'}`}>
-                {!categoryStuck && (
+              <div className={categoryStuck ? "flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2" : "flex items-center justify-between mb-4"}>
+                {categoryStuck ? (
+                  <div className="w-full sm:flex-1 sm:mr-3">
+                    <SearchBar
+                      onSearch={handleSearch}
+                      placeholder="Search products..."
+                      initialValue={searchTerm}
+                      context="collection"
+                    />
+                  </div>
+                ) : (
                   <div className="flex items-center gap-3">
                     <div className="w-1 h-8 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full"></div>
                     <h2 className="text-xl font-bold text-gray-800">Shop by Category</h2>
                   </div>
                 )}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 justify-end">
                   <button
                     onClick={() => scrollCategories('left')}
                     className={`scroll-button ${categoryStuck ? 'p-1.5' : 'p-2'} rounded-full`}
@@ -598,7 +609,7 @@ export default function Products() {
 
               <div 
                 ref={categoryScrollRef}
-                className={`scroll-container flex items-center gap-4 overflow-x-auto overflow-y-visible ${categoryStuck ? 'pb-1' : 'pb-2'}`}
+                className={`scroll-container scrollbar-hide flex items-center gap-4 overflow-x-auto overflow-y-visible ${categoryStuck ? 'pb-1' : 'pb-2'}`}
               >
                 {/* Category Cards */}
                 {parentCategories.map((category, index) => {
