@@ -100,6 +100,73 @@ async function braveWebSearch(query: string, maxResults: number): Promise<WebSea
   return results;
 }
 
+function decodeHtmlEntities(input: string) {
+  return input
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
+function stripTags(input: string) {
+  return decodeHtmlEntities(input.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim());
+}
+
+function decodeDuckDuckGoRedirectUrl(href: string) {
+  const absolute = href.startsWith("http") ? href : `https://duckduckgo.com${href}`;
+  const m = absolute.match(/[?&]uddg=([^&]+)/);
+  if (m?.[1]) {
+    try {
+      return decodeURIComponent(m[1]);
+    } catch {
+      return absolute;
+    }
+  }
+  return absolute;
+}
+
+async function duckDuckGoHtmlSearch(query: string, maxResults: number): Promise<WebSearchResult[]> {
+  const url = `https://duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+  const res = await fetch(url, {
+    headers: {
+      "accept": "text/html",
+      "user-agent": "Mozilla/5.0 (compatible; CartifyBot/1.0; +https://example.com/bot)",
+    },
+  });
+  if (!res.ok) return [];
+  const html = await res.text().catch(() => "");
+  if (!html) return [];
+
+  const results: WebSearchResult[] = [];
+  const re = /<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(html)) && results.length < maxResults) {
+    const href = typeof match[1] === "string" ? match[1] : "";
+    const rawTitle = typeof match[2] === "string" ? match[2] : "";
+    const title = stripTags(rawTitle);
+    const decodedUrl = href ? decodeDuckDuckGoRedirectUrl(href) : "";
+    if (!title || !decodedUrl) continue;
+
+    const from = match.index;
+    const chunk = html.slice(from, Math.min(html.length, from + 1200));
+    const snippetMatch = chunk.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>|class="result__snippet"[^>]*>([\s\S]*?)<\/div>/);
+    const snippetRaw = (snippetMatch?.[1] ?? snippetMatch?.[2] ?? "").toString();
+    const snippet = stripTags(snippetRaw);
+
+    results.push({ title, url: decodedUrl, snippet });
+  }
+  return results;
+}
+
+async function searchWeb(query: string, maxResults: number) {
+  const brave = await braveWebSearch(query, maxResults).catch(() => []);
+  if (brave.length > 0) return { provider: "brave" as const, results: brave };
+  const ddg = await duckDuckGoHtmlSearch(query, maxResults).catch(() => []);
+  if (ddg.length > 0) return { provider: "duckduckgo" as const, results: ddg };
+  return { provider: "none" as const, results: [] as WebSearchResult[] };
+}
+
 function formatWebContext(results: WebSearchResult[]) {
   const lines: string[] = [];
   lines.push("WEB SEARCH RESULTS (use these for factual accuracy, cite them implicitly, and do not invent facts):");
@@ -173,10 +240,23 @@ Deno.serve(async (req: Request) => {
     if (!messagesRaw || messagesRaw.length === 0) return json({ error: "Invalid messages" }, { status: 400 });
 
     let messages = messagesRaw;
+    let webSearchMeta: { enabled: boolean; used: boolean; provider: "brave" | "duckduckgo" | "none"; results_count: number } = {
+      enabled: webSearchEnabled,
+      used: false,
+      provider: "none",
+      results_count: 0,
+    };
     if (webSearchEnabled) {
       const q = lastUserQuery(messagesRaw);
       if (q) {
-        const results = await braveWebSearch(q, 5);
+        const searched = await searchWeb(q, 5);
+        const results = searched.results;
+        webSearchMeta = {
+          enabled: true,
+          used: results.length > 0,
+          provider: searched.provider,
+          results_count: results.length,
+        };
         if (results.length > 0) {
           const ctx = formatWebContext(results);
           const trimmed = ctx.length > 6000 ? ctx.slice(0, 6000) : ctx;
@@ -226,7 +306,9 @@ Deno.serve(async (req: Request) => {
       return json({ error: message }, { status: 500 });
     }
 
-    return json(data);
+    const payload = (isRecord(data) ? { ...data } : { data }) as Record<string, unknown>;
+    payload.__web_search = webSearchMeta;
+    return json(payload);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return json({ error: message }, { status: 500 });
