@@ -260,7 +260,7 @@ export default function Wishlist() {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
           {currentItems.map((item) => {
             const finalPrice = discountedPrice(item.price, item.discount_percentage);
             const isProductUnavailable = !!unavailable[item.id]?.product;
