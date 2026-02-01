@@ -1793,6 +1793,14 @@ const ChatbotComponent = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(() => {
+    try {
+      const v = localStorage.getItem('cp_ai_web_search');
+      if (v === '0') return false;
+      if (v === '1') return true;
+    } catch {}
+    return true;
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   type GeminiGenerateContentResponse = {
@@ -1899,7 +1907,16 @@ const ChatbotComponent = () => {
         { role: 'user', content: messageToSend, imageUrl: uploadedImage || undefined }
       ];
 
-      const data = await callCustomerProfileAi({ messages: apiMessages, model: "gemini-3-flash-preview", temperature: 0.1 });
+      try {
+        localStorage.setItem('cp_ai_web_search', webSearchEnabled ? '1' : '0');
+      } catch {}
+
+      const data = await callCustomerProfileAi({
+        messages: apiMessages,
+        model: "gemini-3-flash-preview",
+        temperature: 0.1,
+        web_search: webSearchEnabled,
+      });
 
       const botResponseRaw = extractGeminiText(data) || "Sorry, I couldn't process that. Please try again.";
       const botResponse = cleanAiText(botResponseRaw);
@@ -1969,7 +1986,7 @@ const ChatbotComponent = () => {
         { role: 'user', content: 'Tell me a joke', imageUrl: undefined }
       ];
 
-      const data = await callCustomerProfileAi({ messages: apiMessages, model: "gemini-3-flash-preview", temperature: 0.1 });
+      const data = await callCustomerProfileAi({ messages: apiMessages, model: "gemini-3-flash-preview", temperature: 0.1, web_search: false });
 
       const jokeResponseRaw = extractGeminiText(data) || "Why did the computer go to the doctor? Because it caught a virus.";
       const jokeResponse = cleanAiText(jokeResponseRaw);
@@ -2011,6 +2028,14 @@ const ChatbotComponent = () => {
           <p className="text-gray-400 text-xs mt-1">English / Hindi / Hinglish</p>
         </div>
         <div className="flex gap-2">
+          <button
+            className="royal-btn-outline px-3 py-1.5 rounded-lg text-xs flex items-center gap-1"
+            onClick={() => setWebSearchEnabled((v) => !v)}
+            disabled={isLoading}
+            type="button"
+          >
+            Web {webSearchEnabled ? 'On' : 'Off'}
+          </button>
           <button 
             className="royal-btn-outline px-3 py-1.5 rounded-lg text-xs flex items-center gap-1"
             onClick={tellJoke}

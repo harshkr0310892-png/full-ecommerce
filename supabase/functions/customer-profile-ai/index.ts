@@ -29,6 +29,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function normalizeBoolean(value: unknown, fallback: boolean) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    if (["true", "1", "yes", "y", "on"].includes(v)) return true;
+    if (["false", "0", "no", "n", "off"].includes(v)) return false;
+  }
+  return fallback;
+}
+
 function parseMessages(value: unknown): IncomingMessage[] | null {
   if (!Array.isArray(value)) return null;
   const out: IncomingMessage[] = [];
@@ -52,6 +62,59 @@ function normalizeTemperature(value: unknown) {
   const t = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(t)) return 0.1;
   return Math.max(0, Math.min(2, t));
+}
+
+function lastUserQuery(messages: IncomingMessage[]) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.role === "user") return (messages[i]?.content ?? "").trim();
+  }
+  return "";
+}
+
+type WebSearchResult = { title: string; url: string; snippet: string };
+
+async function braveWebSearch(query: string, maxResults: number): Promise<WebSearchResult[]> {
+  const key = Deno.env.get("BRAVE_SEARCH_API_KEY") ?? "";
+  if (!key) return [];
+  const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${Math.max(1, Math.min(10, maxResults))}&safesearch=moderate&text_decorations=false`;
+  const res = await fetch(url, {
+    headers: {
+      "accept": "application/json",
+      "X-Subscription-Token": key,
+    },
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !isRecord(data)) return [];
+  const web = data.web;
+  if (!isRecord(web) || !Array.isArray(web.results)) return [];
+  const results: WebSearchResult[] = [];
+  for (const r of web.results) {
+    if (!isRecord(r)) continue;
+    const title = typeof r.title === "string" ? r.title : "";
+    const url = typeof r.url === "string" ? r.url : "";
+    const snippet = typeof r.description === "string" ? r.description : "";
+    if (!title || !url) continue;
+    results.push({ title, url, snippet });
+    if (results.length >= maxResults) break;
+  }
+  return results;
+}
+
+function formatWebContext(results: WebSearchResult[]) {
+  const lines: string[] = [];
+  lines.push("WEB SEARCH RESULTS (use these for factual accuracy, cite them implicitly, and do not invent facts):");
+  results.forEach((r, i) => {
+    const snip = r.snippet ? ` — ${r.snippet}` : "";
+    lines.push(`${i + 1}. ${r.title} (${r.url})${snip}`);
+  });
+  return lines.join("\n");
+}
+
+function injectWebContext(messages: IncomingMessage[], contextText: string) {
+  if (!contextText.trim()) return messages;
+  const insertAt = Math.max(0, messages.length - 1);
+  const injected: IncomingMessage = { role: "user", content: contextText };
+  return [...messages.slice(0, insertAt), injected, ...messages.slice(insertAt)];
 }
 
 function base64UrlToUtf8(b64url: string) {
@@ -102,11 +165,25 @@ Deno.serve(async (req: Request) => {
     if (!GEMINI_API_KEY) return json({ error: "Missing GEMINI_API_KEY" }, { status: 500 });
 
     const body = await req.json().catch(() => null);
-    const messages = parseMessages(isRecord(body) ? body.messages : null);
+    const messagesRaw = parseMessages(isRecord(body) ? body.messages : null);
     const model = normalizeModel(isRecord(body) ? body.model : null);
     const temperature = normalizeTemperature(isRecord(body) ? body.temperature : null);
+    const webSearchEnabled = normalizeBoolean(isRecord(body) ? body.web_search : null, true);
 
-    if (!messages || messages.length === 0) return json({ error: "Invalid messages" }, { status: 400 });
+    if (!messagesRaw || messagesRaw.length === 0) return json({ error: "Invalid messages" }, { status: 400 });
+
+    let messages = messagesRaw;
+    if (webSearchEnabled) {
+      const q = lastUserQuery(messagesRaw);
+      if (q) {
+        const results = await braveWebSearch(q, 5);
+        if (results.length > 0) {
+          const ctx = formatWebContext(results);
+          const trimmed = ctx.length > 6000 ? ctx.slice(0, 6000) : ctx;
+          messages = injectWebContext(messagesRaw, trimmed);
+        }
+      }
+    }
 
     const contents = messages.map((msg) => {
       const parts: Array<{ text?: string; inline_data?: { mime_type: string; data: string } }> = [];
