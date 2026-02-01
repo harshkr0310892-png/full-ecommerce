@@ -356,7 +356,7 @@ export default function Wishlist() {
                     <Button 
                       size="sm" 
                       variant="outline" 
-                      className="flex-1 h-10 sm:h-12 text-xs sm:text-sm px-2 hover:bg-gradient-to-r hover:from-blue-500/20 hover:to-light-blue-500/20 hover:border-blue-500/50 transition-all duration-300"
+                      className="flex-1 h-12 text-xs sm:text-sm px-2 sm:px-3 hover:bg-gradient-to-r hover:from-blue-500/20 hover:to-light-blue-500/20 hover:border-blue-500/50 transition-all duration-300"
                       onClick={() => handleRemoveFromWishlist(item.id)}
                     >
                       <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" />
@@ -365,7 +365,7 @@ export default function Wishlist() {
                     <Button 
                       size="sm" 
                       variant="royal" 
-                      className="flex-1 h-10 sm:h-12 text-xs sm:text-sm px-2"
+                      className="flex-1 h-12 text-xs sm:text-sm px-2 sm:px-3"
                       onClick={() => handleAddToCart(item)}
                       disabled={isUnavailable}
                     >
