@@ -361,6 +361,8 @@ interface CustomerProfile {
 interface Order {
   id: string;
   order_id: string;
+  user_id?: string | null;
+  customer_email?: string | null;
   status: string;
   total: number;
   created_at: string;
@@ -405,6 +407,8 @@ export default function CustomerProfile() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [returns, setReturns] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'orders' | 'returns' | 'chatbot'>('orders');
+  const [cancelOrderId, setCancelOrderId] = useState('');
+  const [cancelling, setCancelling] = useState(false);
   const [editForm, setEditForm] = useState({
     full_name: '',
     phone: '',
@@ -586,6 +590,73 @@ export default function CustomerProfile() {
     } catch (error) {
       console.error('Error loading returns:', error);
       setReturns([]);
+    }
+  };
+
+  const handleCancelOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (cancelling) return;
+
+    const orderId = cancelOrderId.trim().toUpperCase();
+    if (!orderId) {
+      toast.error('Please enter your order ID');
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      const { data: orderData, error: fetchError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('order_id', orderId)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+
+      if (!orderData) {
+        toast.error('Order not found');
+        return;
+      }
+
+      const orderOwnerMismatch = orderData.user_id && profile?.user_id && orderData.user_id !== profile.user_id;
+      const orderEmailMismatch = orderData.customer_email && userEmail && orderData.customer_email !== userEmail;
+      if (orderOwnerMismatch && orderEmailMismatch) {
+        toast.error('Order not found');
+        return;
+      }
+
+      if (['shipped', 'delivered', 'cancelled'].includes(orderData.status)) {
+        toast.error(`Cannot cancel order. Current status: ${orderData.status}`);
+        return;
+      }
+
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ status: 'cancelled' })
+        .eq('id', orderData.id);
+
+      if (updateError) throw updateError;
+
+      await supabase
+        .from('order_messages')
+        .insert({
+          order_id: orderData.id,
+          message: 'Customer cancelled the order.',
+          is_admin: false,
+        });
+
+      setOrders(prev =>
+        prev.map(order =>
+          order.order_id === orderId ? { ...order, status: 'cancelled' } : order
+        )
+      );
+      toast.success('Order cancelled successfully');
+      setCancelOrderId('');
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      toast.error('Failed to cancel order');
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -1142,6 +1213,34 @@ export default function CustomerProfile() {
                         <Package className="w-6 h-6 text-amber-400" />
                         <h2 className="font-display text-2xl font-semibold">Order History</h2>
                       </div>
+                    </div>
+
+                    <div className="royal-card rounded-xl p-6 mb-6">
+                      <div className="flex items-center gap-3 mb-4">
+                        <XCircle className="w-5 h-5 text-red-400" />
+                        <div>
+                          <h3 className="text-amber-300 font-semibold">Cancel Order</h3>
+                          <p className="text-xs text-gray-400">
+                            Enter your order ID to cancel. Shipped or delivered orders cannot be cancelled.
+                          </p>
+                        </div>
+                      </div>
+                      <form onSubmit={handleCancelOrder} className="flex flex-col md:flex-row gap-3">
+                        <Input
+                          value={cancelOrderId}
+                          onChange={(e) => setCancelOrderId(e.target.value)}
+                          placeholder="Enter Order ID (e.g., RYL-XXXXXXXX)"
+                          className="royal-input flex-1"
+                        />
+                        <button
+                          type="submit"
+                          className="royal-btn px-6 py-3 rounded-lg flex items-center justify-center gap-2"
+                          disabled={cancelling}
+                        >
+                          {cancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                          Cancel Order
+                        </button>
+                      </form>
                     </div>
 
                     {orders.length === 0 ? (
