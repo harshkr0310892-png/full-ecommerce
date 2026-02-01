@@ -43,7 +43,7 @@ interface AppliedCoupon {
 
 export default function Checkout() {
   const navigate = useNavigate();
-  const { items, getDiscountedTotal, clearCart, removeItem } = useCartStore();
+  const { items, getDiscountedTotal, clearCart, removeItem, updateItem, updateQuantity } = useCartStore();
   const [isLoading, setIsLoading] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [orderId, setOrderId] = useState('');
@@ -86,15 +86,34 @@ export default function Checkout() {
       });
       (data || []).forEach((p: any) => {
         const s = (p.stock_status || "").toString().toLowerCase();
-        if (["deleted", "inactive", "unavailable", "sold_out"].includes(s)) unavailable.add(p.id);
+        if (["deleted", "inactive", "unavailable"].includes(s)) unavailable.add(p.id);
       });
-      const toRemove = items.filter((it: any) => unavailable.has((it.product_id || it.id.split("#")[0]) as string));
+      const toRemove = items.filter((it: any) => {
+        const pid = (it.product_id || it.id.split("#")[0]) as string;
+        if (unavailable.has(pid)) return true;
+        const productRow = (data || []).find((p: any) => p.id === pid);
+        const status = (productRow?.stock_status || "").toString().toLowerCase();
+        if (status === "sold_out" && !it?.variant_info?.variant_id) return true;
+        return false;
+      });
       if (toRemove.length > 0) {
         toRemove.forEach((it: any) => removeItem(it.id));
         toast.error("Some cart items were removed because the product is unavailable.");
       }
 
       const productMap = new Map<string, any>((data || []).map((p: any) => [p.id, p]));
+      items.forEach((it: any) => {
+        if (it?.variant_info?.variant_id) return;
+        const productId = (it.product_id || it.id.split("#")[0]) as string;
+        const p = productMap.get(productId);
+        if (!p) return;
+        const stockQty = p.stock_quantity === null || p.stock_quantity === undefined ? null : Number(p.stock_quantity);
+        updateItem(it.id, { stock_quantity: stockQty });
+        if (stockQty !== null && Number(it.quantity || 0) > stockQty) {
+          updateQuantity(it.id, Math.max(0, stockQty));
+        }
+      });
+
       const insufficient = items.filter((it: any) => {
         const productId = (it.product_id || it.id.split("#")[0]) as string;
         const p = productMap.get(productId);
@@ -112,7 +131,7 @@ export default function Checkout() {
     return () => {
       active = false;
     };
-  }, [items, productIds, removeItem]);
+  }, [items, productIds, removeItem, updateItem, updateQuantity]);
 
   useEffect(() => {
     if (variantIds.length === 0) {
@@ -149,11 +168,24 @@ export default function Checkout() {
         removedLines.forEach((it: any) => removeItem(it.id));
         toast.error("You're too late — some options are now out of stock.");
       }
+
+      const variantMap = new Map<string, any>(variants.map((v: any) => [v.id, v]));
+      items.forEach((it: any) => {
+        const vid = it?.variant_info?.variant_id as string | undefined;
+        if (!vid) return;
+        const v = variantMap.get(vid);
+        if (!v) return;
+        const stockQty = v.stock_quantity === null || v.stock_quantity === undefined ? null : Number(v.stock_quantity);
+        updateItem(it.id, { stock_quantity: stockQty });
+        if (stockQty !== null && Number(it.quantity || 0) > stockQty) {
+          updateQuantity(it.id, Math.max(0, stockQty));
+        }
+      });
     })();
     return () => {
       active = false;
     };
-  }, [items, removeItem, variantIds]);
+  }, [items, removeItem, updateItem, updateQuantity, variantIds]);
 
   // 3-step checkout
   const [checkoutStep, setCheckoutStep] = useState<1 | 2 | 3>(1);
@@ -569,9 +601,16 @@ export default function Checkout() {
         });
         (productsData || []).forEach((p: any) => {
           const s = (p.stock_status || "").toString().toLowerCase();
-          if (["deleted", "inactive", "unavailable", "sold_out"].includes(s)) unavailable.add(p.id);
+          if (["deleted", "inactive", "unavailable"].includes(s)) unavailable.add(p.id);
         });
-        const toRemove = items.filter((it: any) => unavailable.has((it.product_id || it.id.split("#")[0]) as string));
+        const toRemove = items.filter((it: any) => {
+          const pid = (it.product_id || it.id.split("#")[0]) as string;
+          if (unavailable.has(pid)) return true;
+          const productRow = (productsData || []).find((p: any) => p.id === pid);
+          const status = (productRow?.stock_status || "").toString().toLowerCase();
+          if (status === "sold_out" && !it?.variant_info?.variant_id) return true;
+          return false;
+        });
         if (toRemove.length > 0) {
           toRemove.forEach((it: any) => removeItem(it.id));
           toast.error("Some cart items are unavailable and were removed.");
@@ -1200,6 +1239,7 @@ export default function Checkout() {
                   const variantId = (item as any)?.variant_info?.variant_id as string | undefined;
                   const variantImage = variantId ? variantImages[variantId]?.[0] : undefined;
                   const imageUrl = variantImage || item.image_url;
+                  const maxQty = (item as any).stock_quantity ?? null;
                   return (
                     <div key={item.id} className="flex gap-2 md:gap-3 checkout-summary-item">
                       <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 checkout-summary-item-image">
@@ -1221,6 +1261,11 @@ export default function Checkout() {
                           <p className="text-xs text-muted-foreground">
                             {(item as any).variant_info.attribute_name}:{" "}
                             {((item as any).variant_info.value_name ?? (item as any).variant_info.attribute_value) as any}
+                          </p>
+                        )}
+                        {maxQty !== null && maxQty !== undefined && (
+                          <p className="text-[11px] text-muted-foreground">
+                            Available: {Number(maxQty)}
                           </p>
                         )}
                         <p className="text-xs sm:text-sm text-muted-foreground checkout-summary-item-qty">
