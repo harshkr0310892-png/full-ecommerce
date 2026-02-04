@@ -158,9 +158,11 @@ interface ReturnOrder {
 export default function SellerDashboard() {
   const navigate = useNavigate();
   const [isSellerLoggedIn, setIsSellerLoggedIn] = useState(false);
-  const sellerEmail = sessionStorage.getItem("seller_email");
-  const sellerName = sessionStorage.getItem("seller_name");
-  const sellerId = sessionStorage.getItem("seller_id");
+  const [sellerEmail, setSellerEmail] = useState<string | null>(() => sessionStorage.getItem("seller_email"));
+  const [sellerName, setSellerName] = useState<string | null>(() => sessionStorage.getItem("seller_name"));
+  const [sellerId, setSellerId] = useState<string | null>(() => sessionStorage.getItem("seller_id"));
+  const [hasAuthSession, setHasAuthSession] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   type TabValue = "products" | "attributes" | "orders" | "sales" | "delivery-boys" | "return-orders" | "reviews" | "categories";
   const [activeTab, setActiveTab] = useState<TabValue>("products");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -177,15 +179,6 @@ export default function SellerDashboard() {
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
   const [photoViewerPhotos, setPhotoViewerPhotos] = useState<string[]>([]);
   const [photoViewerIndex, setPhotoViewerIndex] = useState(0);
-  
-  // Debug: Log when photo viewer state changes
-  useEffect(() => {
-    console.log('🖼️ Photo Viewer State:', { 
-      isOpen: photoViewerOpen, 
-      photos: photoViewerPhotos, 
-      index: photoViewerIndex 
-    });
-  }, [photoViewerOpen, photoViewerPhotos, photoViewerIndex]);
   const [orderItems, setOrderItems] = useState<Record<string, { id: string; order_id: string; product_id: string; quantity: number; product_name?: string; product_price?: number; variant_info?: { attribute_name?: string; value_name?: string; variant_id?: string } | null }[]>>({});
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderMessages, setOrderMessages] = useState<Record<string, OrderMessage[]>>({});
@@ -291,15 +284,71 @@ export default function SellerDashboard() {
   };
 
   useEffect(() => {
-    const isLoggedIn = sessionStorage.getItem("seller_logged_in") === "true";
-    setIsSellerLoggedIn(isLoggedIn);
-    if (!isLoggedIn && sellerEmail) {
-      // Try to auto-verify from email in session (set via Header)
-      setIsSellerLoggedIn(true);
-    } else if (!isLoggedIn) {
-      navigate("/seller/login");
-    }
-  }, [navigate, sellerEmail]);
+    let mounted = true;
+
+    const syncAuth = async () => {
+      const { data } = await supabase.auth.getSession();
+      const session = data?.session || null;
+      if (!mounted) return;
+
+      const authed = !!session;
+      setHasAuthSession(authed);
+      setAuthChecked(true);
+
+      if (!authed) {
+        sessionStorage.removeItem("seller_logged_in");
+        sessionStorage.removeItem("seller_email");
+        sessionStorage.removeItem("seller_name");
+        sessionStorage.removeItem("seller_id");
+        setIsSellerLoggedIn(false);
+        setSellerEmail(null);
+        setSellerName(null);
+        setSellerId(null);
+        navigate("/seller/login");
+        return;
+      }
+
+      const email = session?.user?.email || null;
+      if (email) {
+        sessionStorage.setItem("seller_logged_in", "true");
+        sessionStorage.setItem("seller_email", email);
+        setSellerEmail(email);
+        setIsSellerLoggedIn(true);
+      }
+    };
+
+    syncAuth();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const authed = !!session;
+      setHasAuthSession(authed);
+      setAuthChecked(true);
+      if (!authed) {
+        sessionStorage.removeItem("seller_logged_in");
+        sessionStorage.removeItem("seller_email");
+        sessionStorage.removeItem("seller_name");
+        sessionStorage.removeItem("seller_id");
+        setIsSellerLoggedIn(false);
+        setSellerEmail(null);
+        setSellerName(null);
+        setSellerId(null);
+        navigate("/seller/login");
+        return;
+      }
+      const email = session?.user?.email || null;
+      if (email) {
+        sessionStorage.setItem("seller_logged_in", "true");
+        sessionStorage.setItem("seller_email", email);
+        setSellerEmail(email);
+        setIsSellerLoggedIn(true);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      listener?.subscription?.unsubscribe();
+    };
+  }, [navigate]);
 
   const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
@@ -307,6 +356,11 @@ export default function SellerDashboard() {
     sessionStorage.removeItem("seller_email");
     sessionStorage.removeItem("seller_name");
     sessionStorage.removeItem("seller_id");
+    setIsSellerLoggedIn(false);
+    setSellerEmail(null);
+    setSellerName(null);
+    setSellerId(null);
+    setHasAuthSession(false);
     navigate("/seller/login");
   }, [navigate]);
 
@@ -329,9 +383,11 @@ export default function SellerDashboard() {
     if (seller?.id) {
       if (sessionStorage.getItem("seller_id") !== seller.id) {
         sessionStorage.setItem("seller_id", seller.id);
+        setSellerId(seller.id);
       }
       if (seller.name && sessionStorage.getItem("seller_name") !== seller.name) {
         sessionStorage.setItem("seller_name", seller.name);
+        setSellerName(seller.name);
       }
     }
   }, [seller]);
@@ -2664,39 +2720,25 @@ export default function SellerDashboard() {
                         <p className="text-sm font-medium mb-2 text-foreground">Return Images:</p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                           {returnOrder.images.map((imageUrl, index) => (
-                            <div key={index} className="relative group">
-                              <img 
-                                src={imageUrl} 
-                                alt={`Return image ${index + 1}`} 
+                            <button
+                              key={index}
+                              type="button"
+                              className="relative group w-full text-left"
+                              onClick={() => {
+                                setPhotoViewerPhotos(returnOrder.images);
+                                setPhotoViewerIndex(index);
+                                setPhotoViewerOpen(true);
+                              }}
+                            >
+                              <img
+                                src={imageUrl}
+                                alt={`Return image ${index + 1}`}
                                 className="w-full h-24 object-cover rounded-md border border-border cursor-pointer hover:opacity-90 transition-opacity"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  e.preventDefault();
-                                  console.log('📸 Image clicked!', { 
-                                    imageUrl, 
-                                    index, 
-                                    totalImages: returnOrder.images?.length,
-                                    imagesArray: returnOrder.images 
-                                  });
-                                  try {
-                                    setPhotoViewerPhotos(returnOrder.images);
-                                    setPhotoViewerIndex(index);
-                                    setPhotoViewerOpen(true);
-                                    console.log('📷 Setting photo viewer state:', {
-                                      photos: returnOrder.images,
-                                      index: index,
-                                      open: true
-                                    });
-                                    console.log('✅ Photo viewer opened');
-                                  } catch (error) {
-                                    console.error('Error opening photo viewer:', error);
-                                  }
-                                }}
                               />
-                              <div className="absolute inset-0 bg-black/20 rounded-md opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <div className="pointer-events-none absolute inset-0 bg-black/20 rounded-md opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                 <span className="text-white text-xs font-medium">Click to view</span>
                               </div>
-                            </div>
+                            </button>
                           ))}
                         </div>
                         <p className="text-xs text-muted-foreground mt-2">
