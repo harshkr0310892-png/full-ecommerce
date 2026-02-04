@@ -190,11 +190,96 @@ export default function SellerDashboard() {
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
   const [photoViewerPhotos, setPhotoViewerPhotos] = useState<string[]>([]);
   const [photoViewerIndex, setPhotoViewerIndex] = useState(0);
-  const [orderItems, setOrderItems] = useState<Record<string, { id: string; order_id: string; product_id: string; quantity: number; product_name?: string; product_price?: number; variant_info?: { attribute_name?: string; value_name?: string; variant_id?: string } | null }[]>>({});
+  const [orderItems, setOrderItems] = useState<
+    Record<
+      string,
+      {
+        id: string;
+        order_id: string;
+        product_id: string;
+        quantity: number;
+        product_name?: string;
+        product_price?: number;
+        variant_info?: any | null;
+      }[]
+    >
+  >({});
+  const [orderVariantImageById, setOrderVariantImageById] = useState<Record<string, string>>({});
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderMessages, setOrderMessages] = useState<Record<string, OrderMessage[]>>({});
   const [newSellerMessage, setNewSellerMessage] = useState("");
   const [sendingMessage, setSendingMessage] = useState(false);
+
+  const parseVariantInfoValue = (value: any): any | null => {
+    if (!value) return null;
+    if (typeof value === "string") {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return null;
+      }
+    }
+    if (typeof value === "object") return value;
+    return null;
+  };
+
+  const extractVariantIdValue = (variantInfo: any): string | null => {
+    const v = parseVariantInfoValue(variantInfo);
+    if (!v) return null;
+    const id = (v as any).variant_id;
+    return id ? String(id) : null;
+  };
+
+  const buildVariantLabelValue = (variantInfo: any): string | null => {
+    const v = parseVariantInfoValue(variantInfo);
+    if (!v) return null;
+    const name = (v as any).attribute_name || (v as any).attribute;
+    const value = (v as any).attribute_value || (v as any).value_name || (v as any).value;
+    if (!name || !value) return null;
+    return `${String(name)}: ${String(value)}`;
+  };
+
+  useEffect(() => {
+    const loadVariantImages = async () => {
+      const ids = Array.from(
+        new Set(
+          Object.values(orderItems)
+            .flat()
+            .map((it) => extractVariantIdValue(it.variant_info))
+            .filter(Boolean),
+        ),
+      ) as string[];
+      if (ids.length === 0) {
+        setOrderVariantImageById({});
+        return;
+      }
+      const { data, error } = await (supabase as any)
+        .from("product_variants")
+        .select("id, image_urls")
+        .in("id", ids);
+      if (error) return;
+      const next: Record<string, string> = {};
+      (data || []).forEach((v: any) => {
+        const raw = v.image_urls;
+        const urls = Array.isArray(raw)
+          ? raw
+          : typeof raw === "string"
+            ? (() => {
+                try {
+                  const parsed = JSON.parse(raw);
+                  return Array.isArray(parsed) ? parsed : [];
+                } catch {
+                  return [];
+                }
+              })()
+            : [];
+        const first = urls.find(Boolean);
+        if (first) next[String(v.id)] = String(first);
+      });
+      setOrderVariantImageById(next);
+    };
+    loadVariantImages();
+  }, [orderItems]);
   const [productForm, setProductForm] = useState({
     name: "",
     description: "",
@@ -826,10 +911,119 @@ export default function SellerDashboard() {
         if (!latestReturnByOrderId.has(oid)) latestReturnByOrderId.set(oid, r);
       });
 
-      const enrichedOrders = matchedOrders.map((o: any) => ({
-        ...o,
-        _latest_return: latestReturnByOrderId.get(String(o.id)) || null,
-      }));
+      let sellerOrderItems: any[] = [];
+      if (matchedIds.length > 0) {
+        const { data: snapshotItems, error: snapshotError } = await (supabase as any)
+          .from("order_items")
+          .select("id, order_id, product_id, quantity, product_name, product_price, variant_info, seller_id")
+          .in("order_id", matchedIds)
+          .eq("seller_id", sellerActiveId);
+        if (!snapshotError) {
+          sellerOrderItems = (snapshotItems || []) as any[];
+          const { data: joinOrderItems, error: joinOrderItemsError } = await (supabase as any)
+            .from("order_items")
+            .select("id, order_id, product_id, quantity, product_name, product_price, variant_info, products!inner(seller_id)")
+            .in("order_id", matchedIds)
+            .eq("products.seller_id", sellerActiveId);
+          if (joinOrderItemsError) throw joinOrderItemsError;
+          const byId = new Map<string, any>();
+          sellerOrderItems.forEach((it) => byId.set(String(it.id), it));
+          (joinOrderItems || []).forEach((it: any) => {
+            const key = String(it.id);
+            if (!byId.has(key)) byId.set(key, it);
+          });
+          sellerOrderItems = Array.from(byId.values());
+        } else {
+          const { data: joinOrderItems, error: joinOrderItemsError } = await (supabase as any)
+            .from("order_items")
+            .select("id, order_id, product_id, quantity, product_name, product_price, variant_info, products!inner(seller_id)")
+            .in("order_id", matchedIds)
+            .eq("products.seller_id", sellerActiveId);
+          if (joinOrderItemsError) throw joinOrderItemsError;
+          sellerOrderItems = (joinOrderItems || []) as any[];
+        }
+      }
+
+      const productIds = Array.from(new Set(sellerOrderItems.map((it) => it.product_id).filter(Boolean))) as string[];
+      const { data: productRows, error: productRowsError } = productIds.length
+        ? await (supabase as any).from("products").select("id, name, image_url, images").in("id", productIds)
+        : ({ data: [] as any[], error: null } as any);
+      if (productRowsError) throw productRowsError;
+
+      const productById = new Map<string, any>();
+      (productRows || []).forEach((p: any) => productById.set(String(p.id), p));
+
+      const productImageFor = (pid: string): string | null => {
+        const p = productById.get(pid);
+        const first = Array.isArray(p?.images) ? p.images.find(Boolean) : null;
+        return (first as any) || p?.image_url || null;
+      };
+
+      const variantIds = Array.from(
+        new Set(
+          sellerOrderItems
+            .map((it) => extractVariantIdValue(it.variant_info))
+            .filter(Boolean),
+        ),
+      ) as string[];
+
+      const variantImageById = new Map<string, string>();
+      if (variantIds.length > 0) {
+        const { data: variantsData, error: variantsError } = await (supabase as any)
+          .from("product_variants")
+          .select("id, image_urls")
+          .in("id", variantIds);
+        if (variantsError) throw variantsError;
+
+        (variantsData || []).forEach((v: any) => {
+          const raw = v.image_urls;
+          const urls = Array.isArray(raw)
+            ? raw
+            : typeof raw === "string"
+              ? (() => {
+                  try {
+                    const parsed = JSON.parse(raw);
+                    return Array.isArray(parsed) ? parsed : [];
+                  } catch {
+                    return [];
+                  }
+                })()
+              : [];
+          const first = urls.find(Boolean);
+          if (first) variantImageById.set(String(v.id), String(first));
+        });
+      }
+
+      const itemsByOrderId = new Map<string, any[]>();
+      sellerOrderItems.forEach((it: any) => {
+        const oid = String(it.order_id);
+        if (!itemsByOrderId.has(oid)) itemsByOrderId.set(oid, []);
+        itemsByOrderId.get(oid)!.push(it);
+      });
+
+      const enrichedOrders = matchedOrders.map((o: any) => {
+        const orderId = String(o.id);
+        const its = (itemsByOrderId.get(orderId) || []).map((it: any) => {
+          const pid = String(it.product_id);
+          const variantId = extractVariantIdValue(it.variant_info);
+          const variantImage = variantId ? variantImageById.get(variantId) || null : null;
+          const baseImage = productImageFor(pid);
+          return {
+            id: String(it.id),
+            product_id: pid,
+            product_name: String(it.product_name || productById.get(pid)?.name || "Product"),
+            quantity: Number(it.quantity || 0),
+            image_url: variantImage || baseImage,
+            variant_id: variantId,
+            variant_label: buildVariantLabelValue(it.variant_info),
+          };
+        });
+        return {
+          ...o,
+          _latest_return: latestReturnByOrderId.get(orderId) || null,
+          _items: its,
+        };
+      });
 
       setCustomerHistoryOrders(enrichedOrders);
       setCustomerHistoryReturnRequests((returnsData || []) as any[]);
@@ -2658,6 +2852,28 @@ export default function SellerDashboard() {
                                 )}
                               </div>
                             </div>
+                            {Array.isArray(o._items) && o._items.length > 0 && (
+                              <div className="mt-3 p-3 bg-muted/20 rounded-lg">
+                                <div className="space-y-2">
+                                  {o._items.map((it: any) => (
+                                    <div key={it.id} className="flex items-center gap-3">
+                                      <div className="w-12 h-12 rounded-md border border-border bg-muted/30 flex items-center justify-center overflow-hidden shrink-0">
+                                        {it.image_url ? (
+                                          <img src={it.image_url} alt={it.product_name} className="w-full h-full object-cover" />
+                                        ) : (
+                                          <Package className="w-5 h-5 text-muted-foreground/60" />
+                                        )}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-medium text-foreground truncate">{it.product_name}</p>
+                                        {it.variant_label && <p className="text-xs text-muted-foreground">{it.variant_label}</p>}
+                                        <p className="text-xs text-muted-foreground">Qty: {it.quantity}</p>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -2738,7 +2954,10 @@ export default function SellerDashboard() {
                         <div className="space-y-2">
                           {items.map((item) => {
                             const product = getProductById(item.product_id);
-                            const imageUrl = product?.images?.[0] || product?.image_url;
+                            const variantId = extractVariantIdValue(item.variant_info);
+                            const variantImageUrl = variantId ? orderVariantImageById[variantId] : null;
+                            const variantLabel = buildVariantLabelValue(item.variant_info);
+                            const imageUrl = variantImageUrl || product?.images?.[0] || product?.image_url;
                             return (
                               <div key={item.id} className="flex gap-2 items-start">
                                 {imageUrl ? (
@@ -2750,11 +2969,7 @@ export default function SellerDashboard() {
                                 )}
                                 <div className="flex-1 min-w-0">
                                   <p className="font-medium text-base truncate">{item.product_name}</p>
-                                  {item.variant_info && item.variant_info.attribute_name && (
-                                    <p className="text-sm">
-                                      {item.variant_info.attribute_name}: {item.variant_info.value_name}
-                                    </p>
-                                  )}
+                                  {variantLabel && <p className="text-sm">{variantLabel}</p>}
                                   {product?.description && (
                                     <p className="text-sm text-muted-foreground line-clamp-1">{product.description}</p>
                                   )}
