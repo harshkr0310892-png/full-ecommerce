@@ -165,7 +165,16 @@ export default function SellerDashboard() {
   const [sellerId, setSellerId] = useState<string | null>(() => sessionStorage.getItem("seller_id"));
   const [hasAuthSession, setHasAuthSession] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
-  type TabValue = "products" | "attributes" | "orders" | "sales" | "delivery-boys" | "return-orders" | "reviews" | "categories";
+  type TabValue =
+    | "products"
+    | "attributes"
+    | "orders"
+    | "customer-history"
+    | "sales"
+    | "delivery-boys"
+    | "return-orders"
+    | "reviews"
+    | "categories";
   const [activeTab, setActiveTab] = useState<TabValue>("products");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -1479,6 +1488,13 @@ export default function SellerDashboard() {
                       <ShoppingBag className="w-4 h-4 mr-2" /> Orders
                     </Button>
                     <Button
+                      variant={activeTab === "customer-history" ? "royal" : "ghost"}
+                      className="justify-start"
+                      onClick={() => { setActiveTab("customer-history"); setMobileMenuOpen(false); }}
+                    >
+                      <Calendar className="w-4 h-4 mr-2" /> Customer History
+                    </Button>
+                    <Button
                       variant={activeTab === "sales" ? "royal" : "ghost"}
                       className="justify-start"
                       onClick={() => { setActiveTab("sales"); setMobileMenuOpen(false); }}
@@ -1532,6 +1548,10 @@ export default function SellerDashboard() {
             <TabsTrigger value="orders" className="flex items-center gap-2 whitespace-nowrap w-full justify-start sm:w-auto sm:justify-center">
               <ShoppingBag className="w-4 h-4" />
               Orders
+            </TabsTrigger>
+            <TabsTrigger value="customer-history" className="flex items-center gap-2 whitespace-nowrap w-full justify-start sm:w-auto sm:justify-center">
+              <Calendar className="w-4 h-4" />
+              Customer History
             </TabsTrigger>
             <TabsTrigger value="sales" className="flex items-center gap-2 whitespace-nowrap w-full justify-start sm:w-auto sm:justify-center">
               <TrendingUp className="w-4 h-4" />
@@ -2517,46 +2537,14 @@ export default function SellerDashboard() {
             )}
           </TabsContent>
 
-          <TabsContent value="orders" className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <h2 className="font-display text-2xl font-bold">Your Orders</h2>
-                <Button variant="ghost" size="icon" onClick={() => refetchOrders()}>
-                  <RefreshCw className="w-4 h-4" />
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <label className="text-sm text-muted-foreground">Filter:</label>
-                <select
-                  value={orderFilter}
-                  onChange={(e) => setOrderFilter(e.target.value as any)}
-                  className="px-2 py-1 border rounded-md bg-card text-sm"
-                >
-                  <option value="all">All</option>
-                  <option value="this_month">This Month</option>
-                  <option value="by_month">By Month</option>
-                  <option value="week_1">Week 1 (1-7)</option>
-                  <option value="week_2">Week 2 (8-14)</option>
-                  <option value="week_3">Week 3 (15-21)</option>
-                  <option value="week_4">Week 4 (22-31)</option>
-                  <option value="last_7">Last 7 Days</option>
-                  <option value="custom">Custom Range</option>
-                </select>
-
-                {orderFilter === "by_month" && (
-                  <Input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-40" />
-                )}
-
-                {orderFilter === "custom" && (
-                  <div className="flex items-center gap-2">
-                    <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
-                    <span className="text-sm">to</span>
-                    <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
-                  </div>
-                )}
+          <TabsContent value="customer-history" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-display text-2xl font-bold">Customer Order History</h2>
+                <p className="text-sm text-muted-foreground">Email/phone se customer ka order history dekho.</p>
               </div>
             </div>
+
             <Card>
               <CardHeader>
                 <CardTitle>See Customer Order History</CardTitle>
@@ -2678,6 +2666,48 @@ export default function SellerDashboard() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="orders" className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <h2 className="font-display text-2xl font-bold">Your Orders</h2>
+                <Button variant="ghost" size="icon" onClick={() => refetchOrders()}>
+                  <RefreshCw className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <label className="text-sm text-muted-foreground">Filter:</label>
+                <select
+                  value={orderFilter}
+                  onChange={(e) => setOrderFilter(e.target.value as any)}
+                  className="px-2 py-1 border rounded-md bg-card text-sm"
+                >
+                  <option value="all">All</option>
+                  <option value="this_month">This Month</option>
+                  <option value="by_month">By Month</option>
+                  <option value="week_1">Week 1 (1-7)</option>
+                  <option value="week_2">Week 2 (8-14)</option>
+                  <option value="week_3">Week 3 (15-21)</option>
+                  <option value="week_4">Week 4 (22-31)</option>
+                  <option value="last_7">Last 7 Days</option>
+                  <option value="custom">Custom Range</option>
+                </select>
+
+                {orderFilter === "by_month" && (
+                  <Input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-40" />
+                )}
+
+                {orderFilter === "custom" && (
+                  <div className="flex items-center gap-2">
+                    <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
+                    <span className="text-sm">to</span>
+                    <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
+                  </div>
+                )}
+              </div>
+            </div>
             {ordersLoading ? (
               <div className="text-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
