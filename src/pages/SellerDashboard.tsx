@@ -657,6 +657,12 @@ export default function SellerDashboard() {
   const [filterMonth, setFilterMonth] = useState<string>(new Date().toISOString().slice(0,7)); // YYYY-MM
   const [customFrom, setCustomFrom] = useState<string>("");
   const [customTo, setCustomTo] = useState<string>("");
+  const [customerHistoryEmail, setCustomerHistoryEmail] = useState<string>("");
+  const [customerHistoryPhone, setCustomerHistoryPhone] = useState<string>("");
+  const [customerHistoryLoading, setCustomerHistoryLoading] = useState(false);
+  const [customerHistoryOrders, setCustomerHistoryOrders] = useState<any[]>([]);
+  const [customerHistoryReturnRequests, setCustomerHistoryReturnRequests] = useState<any[]>([]);
+  const [customerHistorySearched, setCustomerHistorySearched] = useState(false);
 
   const computeRange = (filterType: string) => {
     const now = new Date();
@@ -713,6 +719,119 @@ export default function SellerDashboard() {
       return d >= range.start && d <= range.end;
     });
   }, [orders, orderFilter, filterMonth, customFrom, customTo]);
+
+  const customerHistorySummary = useMemo(() => {
+    const totalOrders = customerHistoryOrders.length;
+    const statusCounts = customerHistoryOrders.reduce((acc: Record<string, number>, o: any) => {
+      const key = String(o.status || "unknown");
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    const totalReturnRequests = customerHistoryReturnRequests.length;
+    const uniqueReturnOrders = new Set(customerHistoryReturnRequests.map((r: any) => String(r.order_id))).size;
+    return { totalOrders, statusCounts, totalReturnRequests, uniqueReturnOrders };
+  }, [customerHistoryOrders, customerHistoryReturnRequests]);
+
+  const searchCustomerOrderHistory = async () => {
+    const sellerActiveId = seller?.id || sellerId;
+    const email = customerHistoryEmail.trim().toLowerCase();
+    const rawPhone = customerHistoryPhone.trim();
+
+    if (!sellerActiveId) {
+      toast.error("Seller not detected");
+      return;
+    }
+    if (!email && !rawPhone) {
+      toast.error("Email ya phone number daalo");
+      return;
+    }
+
+    const phoneDigits = rawPhone.replace(/\D/g, "");
+    const phoneVariants = Array.from(
+      new Set(
+        [
+          rawPhone,
+          phoneDigits,
+          phoneDigits.length === 10 ? `+91${phoneDigits}` : null,
+          phoneDigits.length === 10 ? `91${phoneDigits}` : null,
+          phoneDigits.length === 12 && phoneDigits.startsWith("91") ? `+${phoneDigits}` : null,
+        ].filter(Boolean) as string[],
+      ),
+    );
+
+    setCustomerHistoryLoading(true);
+    try {
+      const orderIdsSet = new Set<string>();
+
+      const { data: snapshotItems, error: snapshotError } = await (supabase as any)
+        .from("order_items")
+        .select("order_id")
+        .eq("seller_id", sellerActiveId);
+      if (!snapshotError) {
+        (snapshotItems || []).forEach((it: any) => orderIdsSet.add(String(it.order_id)));
+      }
+
+      const { data: joinItems, error: joinError } = await (supabase as any)
+        .from("order_items")
+        .select("order_id, products!inner(seller_id)")
+        .eq("products.seller_id", sellerActiveId);
+      if (joinError) throw joinError;
+      (joinItems || []).forEach((it: any) => orderIdsSet.add(String(it.order_id)));
+
+      const sellerOrderIds = Array.from(orderIdsSet).filter(Boolean);
+      if (sellerOrderIds.length === 0) {
+        setCustomerHistoryOrders([]);
+        setCustomerHistoryReturnRequests([]);
+        setCustomerHistorySearched(true);
+        return;
+      }
+
+      let q = (supabase as any)
+        .from("orders")
+        .select("id, order_id, customer_name, customer_phone, customer_email, status, total, created_at")
+        .in("id", sellerOrderIds)
+        .eq("seller_deleted", false)
+        .order("created_at", { ascending: false });
+
+      if (email) q = q.eq("customer_email", email);
+      if (phoneVariants.length > 0) q = q.in("customer_phone", phoneVariants);
+
+      const { data: ordersData, error: ordersError } = await q;
+      if (ordersError) throw ordersError;
+      const matchedOrders = (ordersData || []) as any[];
+      const matchedIds = matchedOrders.map((o) => String(o.id)).filter(Boolean);
+
+      const { data: returnsData, error: returnsError } = matchedIds.length
+        ? await (supabase as any)
+            .from("returns")
+            .select("order_id, return_status, requested_at")
+            .in("order_id", matchedIds)
+            .neq("return_status", "cancelled")
+            .order("requested_at", { ascending: false })
+        : ({ data: [] as any[], error: null } as any);
+      if (returnsError) throw returnsError;
+
+      const latestReturnByOrderId = new Map<string, any>();
+      (returnsData || []).forEach((r: any) => {
+        const oid = String(r.order_id);
+        if (!latestReturnByOrderId.has(oid)) latestReturnByOrderId.set(oid, r);
+      });
+
+      const enrichedOrders = matchedOrders.map((o: any) => ({
+        ...o,
+        _latest_return: latestReturnByOrderId.get(String(o.id)) || null,
+      }));
+
+      setCustomerHistoryOrders(enrichedOrders);
+      setCustomerHistoryReturnRequests((returnsData || []) as any[]);
+      setCustomerHistorySearched(true);
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Customer order history load nahi ho paaya");
+    } finally {
+      setCustomerHistoryLoading(false);
+    }
+  };
 
   const { data: deliveryBoys } = useQuery({
     queryKey: ["seller-delivery-boys", seller?.id || sellerId],
@@ -2438,6 +2557,127 @@ export default function SellerDashboard() {
                 )}
               </div>
             </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>See Customer Order History</CardTitle>
+                <CardDescription>
+                  Customer ka email/phone daal ke, sirf aapke products wale orders ka history dekho.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label>Email</Label>
+                    <Input
+                      value={customerHistoryEmail}
+                      onChange={(e) => setCustomerHistoryEmail(e.target.value)}
+                      placeholder="customer@email.com"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Phone</Label>
+                    <Input
+                      value={customerHistoryPhone}
+                      onChange={(e) => setCustomerHistoryPhone(e.target.value)}
+                      placeholder="+91XXXXXXXXXX"
+                    />
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <Button
+                      variant="royal"
+                      onClick={() => searchCustomerOrderHistory()}
+                      disabled={customerHistoryLoading}
+                      className="w-full"
+                    >
+                      {customerHistoryLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Searching...
+                        </>
+                      ) : (
+                        "Search"
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setCustomerHistoryEmail("");
+                        setCustomerHistoryPhone("");
+                        setCustomerHistoryOrders([]);
+                        setCustomerHistoryReturnRequests([]);
+                        setCustomerHistorySearched(false);
+                      }}
+                      disabled={customerHistoryLoading}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+
+                {customerHistorySearched && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="p-3 rounded-lg border border-border bg-muted/20">
+                        <p className="text-xs text-muted-foreground">Total Orders</p>
+                        <p className="font-display text-xl font-bold">{customerHistorySummary.totalOrders}</p>
+                      </div>
+                      <div className="p-3 rounded-lg border border-border bg-muted/20">
+                        <p className="text-xs text-muted-foreground">Delivered</p>
+                        <p className="font-display text-xl font-bold">{customerHistorySummary.statusCounts["delivered"] || 0}</p>
+                      </div>
+                      <div className="p-3 rounded-lg border border-border bg-muted/20">
+                        <p className="text-xs text-muted-foreground">Cancelled</p>
+                        <p className="font-display text-xl font-bold">{customerHistorySummary.statusCounts["cancelled"] || 0}</p>
+                      </div>
+                      <div className="p-3 rounded-lg border border-border bg-muted/20">
+                        <p className="text-xs text-muted-foreground">Return Requests</p>
+                        <p className="font-display text-xl font-bold">
+                          {customerHistorySummary.totalReturnRequests}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {customerHistorySummary.uniqueReturnOrders} orders
+                        </p>
+                      </div>
+                    </div>
+
+                    {customerHistoryOrders.length === 0 ? (
+                      <div className="text-sm text-muted-foreground">
+                        Is email/phone ke saath aapke products ka koi order nahi mila.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {customerHistoryOrders.map((o: any) => (
+                          <div key={o.id} className="p-3 rounded-lg border border-border bg-card">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                              <div>
+                                <div className="text-sm text-muted-foreground">Order ID</div>
+                                <div className="font-semibold">{o.order_id}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {new Date(o.created_at).toLocaleString()}
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-foreground">
+                                  Status: {String(o.status || "N/A")}
+                                </span>
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-foreground">
+                                  Total: ₹{Number(o.total || 0).toFixed(2)}
+                                </span>
+                                {o._latest_return && (
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-foreground">
+                                    Return: {String(o._latest_return.return_status || "N/A")}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
             {ordersLoading ? (
               <div className="text-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
