@@ -884,13 +884,26 @@ export default function SellerDashboard() {
         itemsByOrderId.get(oid)!.push(it);
       });
 
+      const resolveReturnImageUrl = (raw: string): string => {
+        const value = String(raw || "").trim();
+        if (!value) return value;
+        if (/^https?:\/\//i.test(value) || value.startsWith("data:")) return value;
+        const withoutBucketPrefix = value.startsWith("return-images/")
+          ? value.slice("return-images/".length)
+          : value;
+        const { data } = supabase.storage.from("return-images").getPublicUrl(withoutBucketPrefix);
+        return data.publicUrl || value;
+      };
+
       const normalizeImages = (value: any): string[] | null => {
         if (!value) return null;
-        if (Array.isArray(value)) return value.filter(Boolean);
+        if (Array.isArray(value)) return value.filter(Boolean).map((v) => resolveReturnImageUrl(String(v)));
         if (typeof value === "string") {
           try {
             const parsed = JSON.parse(value);
-            return Array.isArray(parsed) ? parsed.filter(Boolean) : null;
+            return Array.isArray(parsed)
+              ? parsed.filter(Boolean).map((v: any) => resolveReturnImageUrl(String(v)))
+              : null;
           } catch {
             return null;
           }
