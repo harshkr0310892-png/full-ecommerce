@@ -128,6 +128,7 @@ interface ReturnOrder {
   customer_name: string;
   customer_phone: string;
   customer_address: string;
+  customer_email?: string | null;
   return_reason: string;
   return_status: string;
   requested_at: string;
@@ -140,6 +141,7 @@ interface ReturnOrder {
     customer_name: string;
     customer_phone: string;
     customer_address: string;
+    customer_email?: string | null;
     status: string;
     total: number;
     created_at: string;
@@ -760,7 +762,7 @@ export default function SellerDashboard() {
       const returnOrderIds = Array.from(new Set(returnRows.map((r) => r.order_id).filter(Boolean))) as string[];
       const { data: ordersData, error: ordersError } = await (supabase as any)
         .from("orders")
-        .select("id, order_id, customer_name, customer_phone, customer_address, status, total, created_at")
+        .select("id, order_id, customer_name, customer_phone, customer_address, customer_email, status, total, created_at")
         .in("id", returnOrderIds);
       if (ordersError) throw ordersError;
 
@@ -919,6 +921,7 @@ export default function SellerDashboard() {
               customer_name: order.customer_name,
               customer_phone: order.customer_phone,
               customer_address: order.customer_address,
+              customer_email: order.customer_email ?? null,
               status: order.status,
               total: Number(order.total || 0),
               created_at: order.created_at,
@@ -928,6 +931,7 @@ export default function SellerDashboard() {
               customer_name: ret.customer_name,
               customer_phone: ret.customer_phone,
               customer_address: ret.customer_address,
+              customer_email: null,
               status: "N/A",
               total: 0,
               created_at: ret.requested_at,
@@ -955,6 +959,7 @@ export default function SellerDashboard() {
           customer_name: orderDetails.customer_name,
           customer_phone: orderDetails.customer_phone,
           customer_address: orderDetails.customer_address,
+          customer_email: orderDetails.customer_email ?? null,
           order_details: orderDetails,
           returned_items: returnItems,
         };
@@ -2765,6 +2770,9 @@ export default function SellerDashboard() {
                         <p className="text-sm text-foreground">Customer Details</p>
                         <p className="font-semibold text-base">{returnOrder.customer_name}</p>
                         <p className="text-sm text-muted-foreground">{returnOrder.customer_phone}</p>
+                        {returnOrder.customer_email && (
+                          <p className="text-sm text-muted-foreground">{returnOrder.customer_email}</p>
+                        )}
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground mb-1">Address</p>
