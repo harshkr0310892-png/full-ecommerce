@@ -827,14 +827,9 @@ export default function SellerDashboard() {
   }, [customerHistoryOrders, customerHistoryReturnRequests]);
 
   const searchCustomerOrderHistory = async () => {
-    const sellerActiveId = seller?.id || sellerId;
     const email = customerHistoryEmail.trim().toLowerCase();
     const rawPhone = customerHistoryPhone.trim();
 
-    if (!sellerActiveId) {
-      toast.error("Seller not detected");
-      return;
-    }
     if (!email && !rawPhone) {
       toast.error("Email ya phone number daalo");
       return;
@@ -855,44 +850,28 @@ export default function SellerDashboard() {
 
     setCustomerHistoryLoading(true);
     try {
-      const orderIdsSet = new Set<string>();
+      const baseOrdersQuery = () =>
+        (supabase as any)
+          .from("orders")
+          .select("id, order_id, customer_name, customer_phone, customer_email, status, total, created_at")
+          .eq("seller_deleted", false)
+          .order("created_at", { ascending: false });
 
-      const { data: snapshotItems, error: snapshotError } = await (supabase as any)
-        .from("order_items")
-        .select("order_id")
-        .eq("seller_id", sellerActiveId);
-      if (!snapshotError) {
-        (snapshotItems || []).forEach((it: any) => orderIdsSet.add(String(it.order_id)));
+      const byOrderId = new Map<string, any>();
+
+      if (email) {
+        const { data: emailOrders, error: emailError } = await baseOrdersQuery().ilike("customer_email", email);
+        if (emailError) throw emailError;
+        (emailOrders || []).forEach((o: any) => byOrderId.set(String(o.id), o));
       }
 
-      const { data: joinItems, error: joinError } = await (supabase as any)
-        .from("order_items")
-        .select("order_id, products!inner(seller_id)")
-        .eq("products.seller_id", sellerActiveId);
-      if (joinError) throw joinError;
-      (joinItems || []).forEach((it: any) => orderIdsSet.add(String(it.order_id)));
-
-      const sellerOrderIds = Array.from(orderIdsSet).filter(Boolean);
-      if (sellerOrderIds.length === 0) {
-        setCustomerHistoryOrders([]);
-        setCustomerHistoryReturnRequests([]);
-        setCustomerHistorySearched(true);
-        return;
+      if (phoneVariants.length > 0) {
+        const { data: phoneOrders, error: phoneError } = await baseOrdersQuery().in("customer_phone", phoneVariants);
+        if (phoneError) throw phoneError;
+        (phoneOrders || []).forEach((o: any) => byOrderId.set(String(o.id), o));
       }
 
-      let q = (supabase as any)
-        .from("orders")
-        .select("id, order_id, customer_name, customer_phone, customer_email, status, total, created_at")
-        .in("id", sellerOrderIds)
-        .eq("seller_deleted", false)
-        .order("created_at", { ascending: false });
-
-      if (email) q = q.eq("customer_email", email);
-      if (phoneVariants.length > 0) q = q.in("customer_phone", phoneVariants);
-
-      const { data: ordersData, error: ordersError } = await q;
-      if (ordersError) throw ordersError;
-      const matchedOrders = (ordersData || []) as any[];
+      const matchedOrders = Array.from(byOrderId.values());
       const matchedIds = matchedOrders.map((o) => String(o.id)).filter(Boolean);
 
       const { data: returnsData, error: returnsError } = matchedIds.length
@@ -913,35 +892,12 @@ export default function SellerDashboard() {
 
       let sellerOrderItems: any[] = [];
       if (matchedIds.length > 0) {
-        const { data: snapshotItems, error: snapshotError } = await (supabase as any)
+        const { data: allItems, error: allItemsError } = await (supabase as any)
           .from("order_items")
-          .select("id, order_id, product_id, quantity, product_name, product_price, variant_info, seller_id")
-          .in("order_id", matchedIds)
-          .eq("seller_id", sellerActiveId);
-        if (!snapshotError) {
-          sellerOrderItems = (snapshotItems || []) as any[];
-          const { data: joinOrderItems, error: joinOrderItemsError } = await (supabase as any)
-            .from("order_items")
-            .select("id, order_id, product_id, quantity, product_name, product_price, variant_info, products!inner(seller_id)")
-            .in("order_id", matchedIds)
-            .eq("products.seller_id", sellerActiveId);
-          if (joinOrderItemsError) throw joinOrderItemsError;
-          const byId = new Map<string, any>();
-          sellerOrderItems.forEach((it) => byId.set(String(it.id), it));
-          (joinOrderItems || []).forEach((it: any) => {
-            const key = String(it.id);
-            if (!byId.has(key)) byId.set(key, it);
-          });
-          sellerOrderItems = Array.from(byId.values());
-        } else {
-          const { data: joinOrderItems, error: joinOrderItemsError } = await (supabase as any)
-            .from("order_items")
-            .select("id, order_id, product_id, quantity, product_name, product_price, variant_info, products!inner(seller_id)")
-            .in("order_id", matchedIds)
-            .eq("products.seller_id", sellerActiveId);
-          if (joinOrderItemsError) throw joinOrderItemsError;
-          sellerOrderItems = (joinOrderItems || []) as any[];
-        }
+          .select("id, order_id, product_id, quantity, product_name, product_price, variant_info")
+          .in("order_id", matchedIds);
+        if (allItemsError) throw allItemsError;
+        sellerOrderItems = (allItems || []) as any[];
       }
 
       const productIds = Array.from(new Set(sellerOrderItems.map((it) => it.product_id).filter(Boolean))) as string[];
@@ -2743,7 +2699,7 @@ export default function SellerDashboard() {
               <CardHeader>
                 <CardTitle>See Customer Order History</CardTitle>
                 <CardDescription>
-                  Customer ka email/phone daal ke, sirf aapke products wale orders ka history dekho.
+                  Customer ka email/phone daal ke poora order history dekho (sab sellers ka).
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -2824,7 +2780,7 @@ export default function SellerDashboard() {
 
                     {customerHistoryOrders.length === 0 ? (
                       <div className="text-sm text-muted-foreground">
-                        Is email/phone ke saath aapke products ka koi order nahi mila.
+                        Is email/phone ke saath koi order nahi mila.
                       </div>
                     ) : (
                       <div className="space-y-2">
