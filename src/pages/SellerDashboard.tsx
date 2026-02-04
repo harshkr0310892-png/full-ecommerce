@@ -136,6 +136,7 @@ interface ReturnOrder {
   admin_notes: string | null;
   images: string[] | null;
   order_details?: {
+    order_id: string;
     customer_name: string;
     customer_phone: string;
     customer_address: string;
@@ -143,6 +144,15 @@ interface ReturnOrder {
     total: number;
     created_at: string;
   };
+  returned_items?: {
+    order_item_id: string;
+    product_id: string;
+    product_name: string;
+    quantity: number;
+    image_url: string | null;
+    variant_id?: string | null;
+    variant_label?: string | null;
+  }[];
 }
 
 export default function SellerDashboard() {
@@ -546,7 +556,7 @@ export default function SellerDashboard() {
       const { data: snapshotItems, error: snapshotError } = await (supabase as any)
         .from("order_items")
         .select("order_id")
-        .in('product_id', (sellerProducts || []).map(p => p.id));
+        .in('product_id', (products || []).map(p => p.id));
       if (snapshotError) throw snapshotError;
       (snapshotItems || []).forEach((it: any) => orderIdsSet.add(it.order_id as string));
 
@@ -662,120 +672,224 @@ export default function SellerDashboard() {
     enabled: !!(seller?.id || sellerId),
   });
 
-  const { data: sellerProducts, isLoading: sellerProductsLoading, refetch: refetchSellerProducts } = useQuery({
-    queryKey: ["seller-products", seller?.id || sellerId],
-    queryFn: async () => {
-      const id = seller?.id || sellerId;
-      if (!id) return [];
-      const { data, error } = await (supabase as any)
-        .from("products")
-        .select("id,name,description,price,image_url,stock_status,created_at,seller_name,seller_id,category_id")
-        .eq("seller_id", id)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data as unknown as Product[];
-    },
-    enabled: !!(seller?.id || sellerId),
-  });
-
   // Fetch return orders for seller's products
   const { data: returnOrders, isLoading: returnOrdersLoading, refetch: refetchReturnOrders } = useQuery({
     queryKey: ["seller-return-orders", seller?.id || sellerId],
     queryFn: async () => {
       const id = seller?.id || sellerId;
-      if (!id) return [];
-      
-      console.log('🔍 DEBUG: Fetching return orders for seller:', { id, sellerProductsCount: sellerProducts?.length });
-      
-      // Get all order_ids where order_items contain products from this seller
-      const productIds = (sellerProducts || []).map(p => p.id);
-      console.log('🔍 DEBUG: Seller product IDs:', productIds);
-      
-      const { data: orderItems, error: orderItemsError } = await supabase
-        .from('order_items')
-        .select('order_id')
-        .in('product_id', productIds) as { data: Array<{order_id: string}>; error: any };
-      
-      if (orderItemsError) {
-        console.error('❌ DEBUG: Error fetching order items:', orderItemsError);
-        throw orderItemsError;
-      }
-      
-      console.log('🔍 DEBUG: Found order items:', orderItems?.length || 0);
-      
-      if (!orderItems || orderItems.length === 0) {
-        console.log('🔍 DEBUG: No order items found for seller products');
-        return [];
-      }
-      
-      const orderIds = orderItems.map(oi => oi.order_id);
-      console.log('🔍 DEBUG: Order IDs to check for returns:', orderIds);
-      
-      // Get returns for these orders
-      const { data: returns, error: returnsError } = await supabase
-        .from('returns')
-        .select('*')
-        .in('order_id', orderIds)
-        .neq('return_status', 'cancelled')
-        .order('requested_at', { ascending: false });
-      
-      if (returnsError) {
-        console.error('❌ DEBUG: Error fetching returns:', returnsError);
-        throw returnsError;
-      }
-      
-      console.log('🔍 DEBUG: Found returns:', returns?.length || 0);
-      console.log('🔍 DEBUG: Returns data:', returns);
-      
-      if (!returns || returns.length === 0) {
-        console.log('🔍 DEBUG: No returns found for these orders');
-        return [];
-      }
-      
-      // Get order details for each return
-      const returnOrdersWithDetails = await Promise.all(
-        (returns || []).map(async (ret: any) => {
-          const { data: order, error: orderError } = await supabase
-            .from('orders')
-            .select('customer_name, customer_phone, customer_address, status, total, created_at')
-            .eq('id', ret.order_id)
-            .single();
-          
-          if (orderError) {
-            console.error('Error fetching order details:', orderError);
-            return {
-              ...ret,
-              order_details: {
-                customer_name: ret.customer_name,
-                customer_phone: ret.customer_phone,
-                customer_address: ret.customer_address,
-                status: 'N/A',
-                total: 0,
-                created_at: ret.requested_at
-              }
-            };
+      if (!id) return [] as ReturnOrder[];
+
+      const { data: joinItems, error: joinError } = await (supabase as any)
+        .from("order_items")
+        .select("order_id, products!inner(seller_id)")
+        .eq("products.seller_id", id);
+      if (joinError) throw joinError;
+
+      const orderIds = Array.from(
+        new Set((joinItems || []).map((it: any) => it.order_id).filter(Boolean)),
+      ) as string[];
+      if (orderIds.length === 0) return [] as ReturnOrder[];
+
+      const { data: returns, error: returnsError } = await (supabase as any)
+        .from("returns")
+        .select("*")
+        .in("order_id", orderIds)
+        .neq("return_status", "cancelled")
+        .order("requested_at", { ascending: false });
+      if (returnsError) throw returnsError;
+
+      const returnRows = (returns || []) as any[];
+      if (returnRows.length === 0) return [] as ReturnOrder[];
+
+      const returnOrderIds = Array.from(new Set(returnRows.map((r) => r.order_id).filter(Boolean))) as string[];
+      const { data: ordersData, error: ordersError } = await (supabase as any)
+        .from("orders")
+        .select("id, order_id, customer_name, customer_phone, customer_address, status, total, created_at")
+        .in("id", returnOrderIds);
+      if (ordersError) throw ordersError;
+
+      const orderById = new Map<string, any>();
+      (ordersData || []).forEach((o: any) => orderById.set(o.id as string, o));
+
+      const parseVariantInfo = (value: any): any | null => {
+        if (!value) return null;
+        if (typeof value === "string") {
+          try {
+            return JSON.parse(value);
+          } catch {
+            return null;
           }
-          
-          return {
-            ...ret,
-            order_details: order
-          };
-        })
-      );
-      
-      console.log('🔍 DEBUG: Final return orders with details:', returnOrdersWithDetails);
-      
-      // Log image data specifically
-      returnOrdersWithDetails.forEach((order, idx) => {
-        console.log(`📋 Return Order ${idx + 1}:`, {
-          id: order.id,
-          hasImages: !!order.images,
-          imageCount: order.images?.length || 0,
-          images: order.images
+        }
+        if (typeof value === "object") return value;
+        return null;
+      };
+
+      const extractVariantId = (variantInfo: any): string | null => {
+        const v = parseVariantInfo(variantInfo);
+        if (!v) return null;
+        const id = (v as any).variant_id;
+        return id ? String(id) : null;
+      };
+
+      const buildVariantLabel = (variantInfo: any): string | null => {
+        const v = parseVariantInfo(variantInfo);
+        if (!v) return null;
+        const name = (v as any).attribute_name || (v as any).attribute;
+        const value = (v as any).attribute_value || (v as any).value_name || (v as any).value;
+        if (!name || !value) return null;
+        return `${String(name)}: ${String(value)}`;
+      };
+
+      let sellerOrderItems: any[] = [];
+      const { data: snapshotItems, error: snapshotError } = await (supabase as any)
+        .from("order_items")
+        .select("id, order_id, product_id, quantity, product_name, product_price, variant_info, seller_id")
+        .in("order_id", returnOrderIds)
+        .eq("seller_id", id);
+      if (!snapshotError) {
+        sellerOrderItems = (snapshotItems || []) as any[];
+        const { data: joinOrderItems, error: joinOrderItemsError } = await (supabase as any)
+          .from("order_items")
+          .select("id, order_id, product_id, quantity, product_name, product_price, variant_info, products!inner(seller_id)")
+          .in("order_id", returnOrderIds)
+          .eq("products.seller_id", id);
+        if (joinOrderItemsError) throw joinOrderItemsError;
+        const byId = new Map<string, any>();
+        sellerOrderItems.forEach((it) => byId.set(String(it.id), it));
+        (joinOrderItems || []).forEach((it: any) => {
+          const key = String(it.id);
+          if (!byId.has(key)) byId.set(key, it);
         });
+        sellerOrderItems = Array.from(byId.values());
+      } else {
+        const { data: joinOrderItems, error: joinOrderItemsError } = await (supabase as any)
+          .from("order_items")
+          .select("id, order_id, product_id, quantity, product_name, product_price, variant_info, products!inner(seller_id)")
+          .in("order_id", returnOrderIds)
+          .eq("products.seller_id", id);
+        if (joinOrderItemsError) throw joinOrderItemsError;
+        sellerOrderItems = (joinOrderItems || []) as any[];
+      }
+
+      const productIds = Array.from(new Set(sellerOrderItems.map((it) => it.product_id).filter(Boolean))) as string[];
+      const { data: productRows, error: productRowsError } = productIds.length
+        ? await (supabase as any).from("products").select("id, name, image_url, images").in("id", productIds)
+        : ({ data: [] as any[], error: null } as any);
+      if (productRowsError) throw productRowsError;
+
+      const productById = new Map<string, any>();
+      (productRows || []).forEach((p: any) => productById.set(String(p.id), p));
+
+      const productImageFor = (pid: string): string | null => {
+        const p = productById.get(pid);
+        const first = Array.isArray(p?.images) ? p.images.find(Boolean) : null;
+        return (first as any) || p?.image_url || null;
+      };
+
+      const variantIds = Array.from(
+        new Set(
+          sellerOrderItems
+            .map((it) => extractVariantId(it.variant_info))
+            .filter(Boolean),
+        ),
+      ) as string[];
+
+      const variantImageById = new Map<string, string>();
+      if (variantIds.length > 0) {
+        const { data: variantsData, error: variantsError } = await (supabase as any)
+          .from("product_variants")
+          .select("id, image_urls")
+          .in("id", variantIds);
+        if (variantsError) throw variantsError;
+
+        (variantsData || []).forEach((v: any) => {
+          const raw = v.image_urls;
+          const urls = Array.isArray(raw)
+            ? raw
+            : typeof raw === "string"
+              ? (() => {
+                  try {
+                    const parsed = JSON.parse(raw);
+                    return Array.isArray(parsed) ? parsed : [];
+                  } catch {
+                    return [];
+                  }
+                })()
+              : [];
+          const first = urls.find(Boolean);
+          if (first) variantImageById.set(String(v.id), String(first));
+        });
+      }
+
+      const itemsByOrderId = new Map<string, any[]>();
+      sellerOrderItems.forEach((it: any) => {
+        const oid = String(it.order_id);
+        if (!itemsByOrderId.has(oid)) itemsByOrderId.set(oid, []);
+        itemsByOrderId.get(oid)!.push(it);
       });
-      
-      return returnOrdersWithDetails as unknown as ReturnOrder[];
+
+      const normalizeImages = (value: any): string[] | null => {
+        if (!value) return null;
+        if (Array.isArray(value)) return value.filter(Boolean);
+        if (typeof value === "string") {
+          try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed.filter(Boolean) : null;
+          } catch {
+            return null;
+          }
+        }
+        return null;
+      };
+
+      return returnRows.map((ret: any) => {
+        const order = orderById.get(ret.order_id as string);
+        const orderDetails = order
+          ? {
+              order_id: order.order_id,
+              customer_name: order.customer_name,
+              customer_phone: order.customer_phone,
+              customer_address: order.customer_address,
+              status: order.status,
+              total: Number(order.total || 0),
+              created_at: order.created_at,
+            }
+          : {
+              order_id: ret.order_id,
+              customer_name: ret.customer_name,
+              customer_phone: ret.customer_phone,
+              customer_address: ret.customer_address,
+              status: "N/A",
+              total: 0,
+              created_at: ret.requested_at,
+            };
+
+        const returnItems = (itemsByOrderId.get(String(ret.order_id)) || []).map((it: any) => {
+          const pid = String(it.product_id);
+          const variantId = extractVariantId(it.variant_info);
+          const variantImage = variantId ? variantImageById.get(variantId) || null : null;
+          const baseImage = productImageFor(pid);
+          return {
+            order_item_id: String(it.id),
+            product_id: pid,
+            product_name: String(it.product_name || productById.get(pid)?.name || "Product"),
+            quantity: Number(it.quantity || 0),
+            image_url: variantImage || baseImage,
+            variant_id: variantId,
+            variant_label: buildVariantLabel(it.variant_info),
+          };
+        });
+
+        return {
+          ...ret,
+          images: normalizeImages(ret.images),
+          customer_name: orderDetails.customer_name,
+          customer_phone: orderDetails.customer_phone,
+          customer_address: orderDetails.customer_address,
+          order_details: orderDetails,
+          returned_items: returnItems,
+        };
+      }) as unknown as ReturnOrder[];
     },
     enabled: !!(seller?.id || sellerId),
   });
@@ -794,7 +908,7 @@ export default function SellerDashboard() {
         const byOrder: Record<string, any[]> = {};
         data.forEach(item => {
           const pid = (item as any).product_id as string;
-          const product = (sellerProducts || []).find(p => p.id === pid);
+          const product = (products || []).find(p => p.id === pid);
           if (!product) return;
           const entry = {
             id: (item as any).id as string,
@@ -813,10 +927,10 @@ export default function SellerDashboard() {
       }
     };
     loadItems();
-  }, [orders, sellerProducts]);
+  }, [orders, products]);
 
   const getProductById = (id: string) => {
-    return (sellerProducts || []).find(p => p.id === id);
+    return (products || []).find(p => p.id === id);
   };
 
   const addFeature = () => {
@@ -2491,6 +2605,12 @@ export default function SellerDashboard() {
                       <div>
                         <p className="text-sm text-muted-foreground">Return ID</p>
                         <p className="font-display text-xl font-bold text-foreground">{returnOrder.id.substring(0, 8)}...</p>
+                        <p className="text-sm text-muted-foreground mt-2">Order ID</p>
+                        <p className="font-medium text-sm text-foreground">
+                          {returnOrder.order_details?.order_id
+                            ? returnOrder.order_details.order_id
+                            : `${returnOrder.order_id.substring(0, 8)}...`}
+                        </p>
                         <div className="mt-1">
                           <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-foreground">
                             {returnOrder.return_status === 'requested' ? 'Pending Review' : returnOrder.return_status.charAt(0).toUpperCase() + returnOrder.return_status.slice(1)}
@@ -2513,6 +2633,30 @@ export default function SellerDashboard() {
                         </div>
                       )}
                     </div>
+
+                    {returnOrder.returned_items && returnOrder.returned_items.length > 0 && (
+                      <div className="mb-3 p-3 bg-muted/30 rounded-lg">
+                        <p className="text-sm font-medium mb-2 text-foreground">Returned Product{returnOrder.returned_items.length !== 1 ? "s" : ""}:</p>
+                        <div className="space-y-2">
+                          {returnOrder.returned_items.map((it) => (
+                            <div key={it.order_item_id} className="flex items-center gap-3 bg-background rounded-lg border border-border p-2">
+                              <div className="w-16 h-16 rounded-md border border-border bg-muted/20 flex items-center justify-center overflow-hidden shrink-0">
+                                {it.image_url ? (
+                                  <img src={it.image_url} alt={it.product_name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <Package className="w-6 h-6 text-muted-foreground/60" />
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium text-foreground truncate">{it.product_name}</p>
+                                {it.variant_label && <p className="text-xs text-muted-foreground">{it.variant_label}</p>}
+                                <p className="text-xs text-muted-foreground">Qty: {it.quantity}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     
                     {/* Images Section */}
                     {returnOrder.images && returnOrder.images.length > 0 && (
@@ -2576,9 +2720,6 @@ export default function SellerDashboard() {
                     </div>
                     
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t border-border/50">
-                      <div className="text-sm text-muted-foreground">
-                        Order ID: {returnOrder.order_id.substring(0, 8)}...
-                      </div>
                       <div className="text-sm text-muted-foreground">
                         Requested: {new Date(returnOrder.requested_at).toLocaleString()}
                       </div>
