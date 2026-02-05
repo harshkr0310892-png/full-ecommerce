@@ -19,7 +19,7 @@ export default function SellerLogin() {
       const params = new URLSearchParams(window.location.search);
       const auto = params.get("auto");
       const id = params.get("id");
-      const e = params.get("e") || params.get("email");
+      const e = (params.get("e") || params.get("email") || "").trim();
       if (auto !== "1" || !id || !e) return;
 
       setLoading(true);
@@ -28,7 +28,7 @@ export default function SellerLogin() {
           .from("sellers")
           .select("id, name, email, is_active, is_banned")
           .eq("id", id)
-          .eq("email", e)
+          .ilike("email", e)
           .maybeSingle();
         if (error) throw error;
         if (!data) {

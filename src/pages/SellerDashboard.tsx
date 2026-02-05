@@ -386,7 +386,8 @@ export default function SellerDashboard() {
       const params = new URLSearchParams(window.location.search);
       const auto = params.get("auto");
       const autoId = params.get("id");
-      const autoEmail = params.get("e") || params.get("email");
+      const autoEmailRaw = params.get("e") || params.get("email");
+      const autoEmail = (autoEmailRaw || "").trim();
 
       if (auto === "1" && autoId && autoEmail) {
         try {
@@ -394,7 +395,7 @@ export default function SellerDashboard() {
             .from("sellers")
             .select("id, name, email, is_active, is_banned")
             .eq("id", autoId)
-            .eq("email", autoEmail)
+            .ilike("email", autoEmail)
             .maybeSingle();
           if (error) throw error;
           if (!data) {
@@ -460,20 +461,20 @@ export default function SellerDashboard() {
       setHasAuthSession(authed);
       setAuthChecked(true);
 
+      const storedLoggedIn = sessionStorage.getItem("seller_logged_in") === "true";
+      const storedEmail = sessionStorage.getItem("seller_email");
+      const storedName = sessionStorage.getItem("seller_name");
+      const storedId = sessionStorage.getItem("seller_id");
+
+      if (storedLoggedIn && storedEmail) {
+        setSellerEmail(storedEmail);
+        setSellerName(storedName);
+        setSellerId(storedId);
+        setIsSellerLoggedIn(true);
+        return;
+      }
+
       if (!authed) {
-        const storedLoggedIn = sessionStorage.getItem("seller_logged_in") === "true";
-        const storedEmail = sessionStorage.getItem("seller_email");
-        const storedName = sessionStorage.getItem("seller_name");
-        const storedId = sessionStorage.getItem("seller_id");
-
-        if (storedLoggedIn && storedEmail) {
-          setSellerEmail(storedEmail);
-          setSellerName(storedName);
-          setSellerId(storedId);
-          setIsSellerLoggedIn(true);
-          return;
-        }
-
         sessionStorage.removeItem("seller_logged_in");
         sessionStorage.removeItem("seller_email");
         sessionStorage.removeItem("seller_name");
@@ -504,13 +505,7 @@ export default function SellerDashboard() {
       if (!authed) {
         const storedLoggedIn = sessionStorage.getItem("seller_logged_in") === "true";
         const storedEmail = sessionStorage.getItem("seller_email");
-        if (storedLoggedIn && storedEmail) {
-          setSellerEmail(storedEmail);
-          setSellerName(sessionStorage.getItem("seller_name"));
-          setSellerId(sessionStorage.getItem("seller_id"));
-          setIsSellerLoggedIn(true);
-          return;
-        }
+        if (storedLoggedIn && storedEmail) return;
         sessionStorage.removeItem("seller_logged_in");
         sessionStorage.removeItem("seller_email");
         sessionStorage.removeItem("seller_name");
@@ -522,6 +517,9 @@ export default function SellerDashboard() {
         navigate("/seller/login");
         return;
       }
+      const storedLoggedIn = sessionStorage.getItem("seller_logged_in") === "true";
+      const storedEmail = sessionStorage.getItem("seller_email");
+      if (storedLoggedIn && storedEmail) return;
       const email = session?.user?.email || null;
       if (email) {
         sessionStorage.setItem("seller_logged_in", "true");
@@ -558,7 +556,7 @@ export default function SellerDashboard() {
       const { data, error } = await supabase
         .from("sellers")
         .select("*")
-        .eq("email", sellerEmail)
+        .ilike("email", sellerEmail.trim())
         .maybeSingle();
       if (error) throw error;
       return data as Seller | null;
