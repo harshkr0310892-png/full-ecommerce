@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,79 @@ export default function SellerLogin() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const doAutoLogin = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const auto = params.get("auto");
+      const id = params.get("id");
+      const e = params.get("e") || params.get("email");
+      if (auto !== "1" || !id || !e) return;
+
+      setLoading(true);
+      try {
+        const { data, error } = await (supabase as any)
+          .from("sellers")
+          .select("id, name, email, is_active, is_banned")
+          .eq("id", id)
+          .eq("email", e)
+          .maybeSingle();
+        if (error) throw error;
+        if (!data) {
+          toast.error("Invalid auto-login link");
+          return;
+        }
+        if (!(data as any).is_active) {
+          toast.error("Seller is inactive");
+          return;
+        }
+        if ((data as any).is_banned) {
+          toast.error("Seller is banned");
+          return;
+        }
+        sessionStorage.setItem("seller_logged_in", "true");
+        sessionStorage.setItem("seller_email", (data as any).email);
+        sessionStorage.setItem("seller_name", (data as any).name);
+        sessionStorage.setItem("seller_id", (data as any).id);
+        toast.success("Logged in!");
+        navigate("/seller", { replace: true });
+      } catch (err) {
+        console.error("Seller auto-login error:", err);
+        toast.error("Failed to auto-login");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const handleAuthRedirect = async () => {
+      try {
+        const url = new URL(window.location.href);
+        const code = url.searchParams.get("code");
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (!error) {
+            url.searchParams.delete("code");
+            window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+          }
+          navigate("/seller", { replace: true });
+          return;
+        }
+        if (window.location.hash && window.location.hash.includes("access_token")) {
+          const fn = (supabase.auth as any).getSessionFromUrl;
+          if (typeof fn === "function") {
+            await fn({ storeSession: true });
+            window.history.replaceState({}, document.title, `${url.pathname}${url.search}`);
+            navigate("/seller", { replace: true });
+          }
+        }
+      } catch (e) {
+        console.error("Auth redirect handling error:", e);
+      }
+    };
+
+    doAutoLogin();
+    handleAuthRedirect();
+  }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +134,7 @@ export default function SellerLogin() {
       sessionStorage.setItem("seller_logged_in", "true");
       sessionStorage.setItem("seller_email", data.email);
       sessionStorage.setItem("seller_name", data.name);
+      sessionStorage.setItem("seller_id", data.id);
       toast.success("Login successful!");
       navigate("/seller");
     } catch (err) {

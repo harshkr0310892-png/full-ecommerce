@@ -383,6 +383,75 @@ export default function SellerDashboard() {
     let mounted = true;
 
     const syncAuth = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const auto = params.get("auto");
+      const autoId = params.get("id");
+      const autoEmail = params.get("e") || params.get("email");
+
+      if (auto === "1" && autoId && autoEmail) {
+        try {
+          const { data, error } = await (supabase as any)
+            .from("sellers")
+            .select("id, name, email, is_active, is_banned")
+            .eq("id", autoId)
+            .eq("email", autoEmail)
+            .maybeSingle();
+          if (error) throw error;
+          if (!data) {
+            toast.error("Invalid auto-login link");
+            navigate("/seller/login", { replace: true });
+            return;
+          }
+          if (!(data as any).is_active) {
+            toast.error("Seller is inactive");
+            navigate("/seller/login", { replace: true });
+            return;
+          }
+          if ((data as any).is_banned) {
+            toast.error("Seller is banned");
+            navigate("/seller/login", { replace: true });
+            return;
+          }
+          sessionStorage.setItem("seller_logged_in", "true");
+          sessionStorage.setItem("seller_email", (data as any).email);
+          sessionStorage.setItem("seller_name", (data as any).name);
+          sessionStorage.setItem("seller_id", (data as any).id);
+          setSellerEmail((data as any).email);
+          setSellerName((data as any).name);
+          setSellerId((data as any).id);
+          setIsSellerLoggedIn(true);
+          setHasAuthSession(false);
+          setAuthChecked(true);
+          navigate("/seller", { replace: true });
+          return;
+        } catch (e) {
+          console.error("Seller auto-login error:", e);
+          toast.error("Failed to auto-login");
+          navigate("/seller/login", { replace: true });
+          return;
+        }
+      }
+
+      try {
+        const url = new URL(window.location.href);
+        const code = url.searchParams.get("code");
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (!error) {
+            url.searchParams.delete("code");
+            window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+          }
+        } else if (window.location.hash && window.location.hash.includes("access_token")) {
+          const fn = (supabase.auth as any).getSessionFromUrl;
+          if (typeof fn === "function") {
+            await fn({ storeSession: true });
+            window.history.replaceState({}, document.title, `${url.pathname}${url.search}`);
+          }
+        }
+      } catch (e) {
+        console.error("Auth redirect handling error:", e);
+      }
+
       const { data } = await supabase.auth.getSession();
       const session = data?.session || null;
       if (!mounted) return;
@@ -392,6 +461,19 @@ export default function SellerDashboard() {
       setAuthChecked(true);
 
       if (!authed) {
+        const storedLoggedIn = sessionStorage.getItem("seller_logged_in") === "true";
+        const storedEmail = sessionStorage.getItem("seller_email");
+        const storedName = sessionStorage.getItem("seller_name");
+        const storedId = sessionStorage.getItem("seller_id");
+
+        if (storedLoggedIn && storedEmail) {
+          setSellerEmail(storedEmail);
+          setSellerName(storedName);
+          setSellerId(storedId);
+          setIsSellerLoggedIn(true);
+          return;
+        }
+
         sessionStorage.removeItem("seller_logged_in");
         sessionStorage.removeItem("seller_email");
         sessionStorage.removeItem("seller_name");
@@ -420,6 +502,15 @@ export default function SellerDashboard() {
       setHasAuthSession(authed);
       setAuthChecked(true);
       if (!authed) {
+        const storedLoggedIn = sessionStorage.getItem("seller_logged_in") === "true";
+        const storedEmail = sessionStorage.getItem("seller_email");
+        if (storedLoggedIn && storedEmail) {
+          setSellerEmail(storedEmail);
+          setSellerName(sessionStorage.getItem("seller_name"));
+          setSellerId(sessionStorage.getItem("seller_id"));
+          setIsSellerLoggedIn(true);
+          return;
+        }
         sessionStorage.removeItem("seller_logged_in");
         sessionStorage.removeItem("seller_email");
         sessionStorage.removeItem("seller_name");
@@ -474,6 +565,24 @@ export default function SellerDashboard() {
     },
     enabled: !!sellerEmail,
   });
+
+  useEffect(() => {
+    if (!authChecked) return;
+    if (!sellerEmail) return;
+    if (sellerLoading) return;
+    if (!seller) {
+      sessionStorage.removeItem("seller_logged_in");
+      sessionStorage.removeItem("seller_email");
+      sessionStorage.removeItem("seller_name");
+      sessionStorage.removeItem("seller_id");
+      setIsSellerLoggedIn(false);
+      setSellerEmail(null);
+      setSellerName(null);
+      setSellerId(null);
+      toast.error("Access denied");
+      navigate("/seller/login", { replace: true });
+    }
+  }, [authChecked, sellerEmail, sellerLoading, seller, navigate]);
 
   useEffect(() => {
     if (seller?.id) {
@@ -854,13 +963,12 @@ export default function SellerDashboard() {
         (supabase as any)
           .from("orders")
           .select("id, order_id, customer_name, customer_phone, customer_email, status, total, created_at")
-          .eq("seller_deleted", false)
           .order("created_at", { ascending: false });
 
       const byOrderId = new Map<string, any>();
 
       if (email) {
-        const { data: emailOrders, error: emailError } = await baseOrdersQuery().ilike("customer_email", email);
+        const { data: emailOrders, error: emailError } = await baseOrdersQuery().ilike("customer_email", `%${email}%`);
         if (emailError) throw emailError;
         (emailOrders || []).forEach((o: any) => byOrderId.set(String(o.id), o));
       }
@@ -869,6 +977,12 @@ export default function SellerDashboard() {
         const { data: phoneOrders, error: phoneError } = await baseOrdersQuery().in("customer_phone", phoneVariants);
         if (phoneError) throw phoneError;
         (phoneOrders || []).forEach((o: any) => byOrderId.set(String(o.id), o));
+      }
+
+      if (phoneDigits.length > 0) {
+        const { data: phoneLikeOrders, error: phoneLikeError } = await baseOrdersQuery().ilike("customer_phone", `%${phoneDigits}%`);
+        if (phoneLikeError) throw phoneLikeError;
+        (phoneLikeOrders || []).forEach((o: any) => byOrderId.set(String(o.id), o));
       }
 
       const matchedOrders = Array.from(byOrderId.values());
