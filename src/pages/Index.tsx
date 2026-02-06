@@ -339,7 +339,7 @@ export default function Index() {
       icon: Headphones, 
       title: '24/7 Premium Support', 
       description: 'Our dedicated support team is here to help you anytime via chat, email, or phone.',
-      color: 'bg-gradient-to-br from-blue-500 to-purple-500'
+      color: 'bg-gradient-to-br from-blue-500 to-cyan-500'
     },
   ];
 

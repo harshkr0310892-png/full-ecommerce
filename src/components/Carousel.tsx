@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, PanInfo, useMotionValue, useTransform } from 'framer-motion';
 import React, { JSX } from 'react';
+import { Truck, Shield, RefreshCw, Headphones, Star } from 'lucide-react';
 
-// replace icons with your own if needed
-import { Truck, Shield, RefreshCw, Headphones, Star, Zap } from 'lucide-react';
-
+// --- Types ---
 export interface CarouselItem {
   title: string;
   description: string;
@@ -20,104 +19,155 @@ export interface CarouselProps {
   pauseOnHover?: boolean;
   loop?: boolean;
   round?: boolean;
-  alignment?: 'center' | 'right' | 'left'; // Added alignment prop
+  alignment?: 'center' | 'right' | 'left';
 }
 
+// --- Data ---
 const DEFAULT_ITEMS: CarouselItem[] = [
   {
-    title: 'Lightning Fast Delivery',
-    description: 'Get your orders delivered within 2-3 business days. Free shipping on orders above ₹499.',
+    title: 'Lightning Fast',
+    description: 'Orders delivered in 2-3 days. Free shipping over $50.',
     id: 1,
-    icon: <Truck className="h-[30px] w-[30px] text-white" />
+    icon: <Truck className="h-6 w-6 text-white" />
   },
   {
-    title: '100% Secure Payments',
-    description: 'Your payment information is processed securely. We support all major payment methods.',
+    title: 'Secure Payments',
+    description: 'Your info is processed securely. We support all major cards.',
     id: 2,
-    icon: <Shield className="h-[20px] w-[20px] text-white" />
+    icon: <Shield className="h-6 w-6 text-white" />
   },
   {
     title: 'Easy Returns',
-    description: '7-day hassle-free returns. No questions asked. Full refund guaranteed.',
+    description: '7-day hassle-free returns. Full refunds guaranteed.',
     id: 3,
-    icon: <RefreshCw className="h-[20px] w-[20px] text-white" />
+    icon: <RefreshCw className="h-6 w-6 text-white" />
   },
   {
-    title: '24/7 Premium Support',
-    description: 'Our dedicated support team is here to help you anytime via chat, email, or phone.',
+    title: '24/7 Support',
+    description: 'Our team is here to help via chat, email, or phone.',
     id: 4,
-    icon: <Headphones className="h-[20px] w-[20px] text-white" />
+    icon: <Headphones className="h-6 w-6 text-white" />
   },
   {
     title: 'Trusted Service',
-    description: 'Join thousands of satisfied customers who trust our service.',
+    description: 'Join thousands of satisfied customers who trust us.',
     id: 5,
-    icon: <Star className="h-[20px] w-[20px] text-white" />
+    icon: <Star className="h-6 w-6 text-white" />
   }
 ];
 
+// --- Constants ---
 const DRAG_BUFFER = 0;
 const VELOCITY_THRESHOLD = 500;
 const GAP = 16;
 const SPRING_OPTIONS = { type: 'spring' as const, stiffness: 300, damping: 30 };
 
+// --- Sub-Component: Item ---
 interface CarouselItemProps {
   item: CarouselItem;
   index: number;
   itemWidth: number;
+  itemHeight: number;
   round: boolean;
   trackItemOffset: number;
   x: any;
-  transition: any;
 }
 
-function CarouselItem({ item, index, itemWidth, round, trackItemOffset, x, transition }: CarouselItemProps) {
-  const range = [-(index + 1) * trackItemOffset, -index * trackItemOffset, -(index - 1) * trackItemOffset];
-  const outputRange = [90, 0, -90];
-  const rotateY = useTransform(x, range, outputRange, { clamp: false });
+function CarouselItemCard({ 
+  item, 
+  index, 
+  itemWidth, 
+  itemHeight,
+  round, 
+  trackItemOffset, 
+  x 
+}: CarouselItemProps) {
+  const range = [
+    -(index + 1) * trackItemOffset, 
+    -index * trackItemOffset, 
+    -(index - 1) * trackItemOffset
+  ];
+  
+  const rotateY = useTransform(x, range, [45, 0, -45], { clamp: false });
+  const opacity = useTransform(x, range, [0.5, 1, 0.5], { clamp: false });
+  const scale = useTransform(x, range, [0.9, 1, 0.9], { clamp: false });
 
   return (
     <motion.div
-      key={`${item?.id ?? index}-${index}`}
-      className={`relative shrink-0 flex flex-col ${
+      className={`relative shrink-0 flex flex-col overflow-hidden cursor-grab active:cursor-grabbing select-none ${
         round
-          ? 'items-center justify-center text-center bg-[#060010] border-0'
-          : 'items-start justify-between bg-gradient-to-br from-blue-900/60 via-purple-900/60 to-blue-800/60 border border-blue-500/70 rounded-[12px]'
-      } overflow-hidden cursor-grab active:cursor-grabbing`}
+          ? 'items-center justify-center text-center rounded-full border-2 border-white/10 bg-gradient-to-b from-neutral-800 to-neutral-900'
+          : 'items-start justify-start rounded-2xl border border-white/10 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md'
+      }`}
       style={{
         width: itemWidth,
-        height: round ? itemWidth : '100%',
-        rotateY: rotateY,
-        ...(round && { borderRadius: '50%' })
+        height: round ? itemWidth : itemHeight,
+        rotateY,
+        opacity,
+        scale,
       }}
-      transition={transition}
     >
-      <div className={`${round ? 'p-0 m-0' : 'mb-4 p-5'}`}>
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-purple-500">
-          {item.icon}
-        </span>
-      </div>
-      <div className="p-5">
-        <div className="mb-1 font-black text-lg text-white">{item.title}</div>
-        <p className="text-sm text-white">{item.description}</p>
+      {/* Glossy overlay */}
+      {!round && (
+        <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-transparent pointer-events-none" />
+      )}
+
+      {/* Content wrapper with proper padding */}
+      <div className={`relative z-10 flex flex-col h-full w-full ${
+        round ? 'items-center justify-center p-6' : 'p-5'
+      }`}>
+        {/* Icon */}
+        <div className={`${round ? 'mb-3' : 'mb-4'}`}>
+          <span className={`flex items-center justify-center ${
+            round 
+              ? 'h-14 w-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30' 
+              : 'h-11 w-11 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 shadow-lg shadow-purple-500/25'
+          }`}>
+            {item.icon}
+          </span>
+        </div>
+
+        {/* Text */}
+        <div className={round ? 'px-2' : ''}>
+          <h3 className={`font-semibold text-white tracking-tight leading-tight ${
+            round ? 'text-base mb-1.5' : 'text-lg mb-2'
+          }`}>
+            {item.title}
+          </h3>
+          <p className={`font-normal leading-relaxed ${
+            round ? 'text-xs text-gray-400' : 'text-sm text-gray-400'
+          }`}>
+            {item.description}
+          </p>
+        </div>
       </div>
     </motion.div>
   );
 }
 
+// --- Main Component ---
 export default function Carousel({
   items = DEFAULT_ITEMS,
-  baseWidth = 300,
+  baseWidth = 320,
   autoplay = false,
   autoplayDelay = 3000,
   pauseOnHover = false,
   loop = false,
   round = false,
-  alignment = 'center' // Default to center
+  alignment = 'center'
 }: CarouselProps): JSX.Element {
-  const containerPadding = 16;
-  const itemWidth = baseWidth - containerPadding * 2;
+  
+  // Fixed padding values
+  const containerPadding = 24; // matches p-6
+  const itemWidth = baseWidth - (containerPadding * 2);
+  const itemHeight = round ? itemWidth : 220; // Fixed height for non-round items
   const trackItemOffset = itemWidth + GAP;
+  
+  // Container height calculation
+  const containerHeight = round 
+    ? baseWidth 
+    : itemHeight + (containerPadding * 2) + 40; // 40px for pagination area
+
   const itemsForRender = useMemo(() => {
     if (!loop) return items;
     if (items.length === 0) return [];
@@ -131,6 +181,7 @@ export default function Carousel({
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (pauseOnHover && containerRef.current) {
       const container = containerRef.current;
@@ -170,9 +221,7 @@ export default function Carousel({
 
   const effectiveTransition = isJumping ? { duration: 0 } : SPRING_OPTIONS;
 
-  const handleAnimationStart = () => {
-    setIsAnimating(true);
-  };
+  const handleAnimationStart = () => setIsAnimating(true);
 
   const handleAnimationComplete = () => {
     if (!loop || itemsForRender.length <= 1) {
@@ -208,7 +257,7 @@ export default function Carousel({
     setIsAnimating(false);
   };
 
-  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo): void => {
+  const handleDragEnd = (_: any, info: PanInfo): void => {
     const { offset, velocity } = info;
     const direction =
       offset.x < -DRAG_BUFFER || velocity.x < -VELOCITY_THRESHOLD
@@ -236,33 +285,45 @@ export default function Carousel({
       };
 
   const activeIndex =
-    items.length === 0 ? 0 : loop ? (position - 1 + items.length) % items.length : Math.min(position, items.length - 1);
+    items.length === 0 
+      ? 0 
+      : loop 
+        ? (position - 1 + items.length) % items.length 
+        : Math.min(position, items.length - 1);
 
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden p-4 ${
-        round ? 'rounded-full border border-white' : 'rounded-[24px] border border-blue-500/50 bg-gradient-to-br from-blue-900/30 via-purple-900/30 to-blue-800/30'
+      className={`relative overflow-hidden ${
+        round 
+          ? 'rounded-full border border-white/20 bg-neutral-900/80' 
+          : 'rounded-3xl border border-white/10 bg-neutral-950/90 shadow-2xl shadow-black/50'
       } ${
         alignment === 'center' ? 'mx-auto' : 
         alignment === 'right' ? 'ml-auto' : 
-        alignment === 'left' ? '' : 'mx-auto' // default to center if invalid value
+        ''
       }`}
       style={{
-        width: `${baseWidth}px`,
-        ...(round && { height: `${baseWidth}px` })
+        width: baseWidth,
+        height: containerHeight,
+        padding: containerPadding,
       }}
     >
+      {/* Background Glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/2 h-1/2 bg-indigo-500/15 blur-[80px] rounded-full pointer-events-none" />
+
+      {/* Carousel Track */}
       <motion.div
         className="flex"
         drag={isAnimating ? false : 'x'}
         {...dragProps}
         style={{
-          width: itemWidth,
-          gap: `${GAP}px`,
+          gap: GAP,
           perspective: 1000,
           perspectiveOrigin: `${position * trackItemOffset + itemWidth / 2}px 50%`,
-          x
+          x,
+          height: round ? '100%' : itemHeight,
+          alignItems: 'center',
         }}
         onDragEnd={handleDragEnd}
         animate={{ x: -(position * trackItemOffset) }}
@@ -271,37 +332,38 @@ export default function Carousel({
         onAnimationComplete={handleAnimationComplete}
       >
         {itemsForRender.map((item, index) => (
-          <CarouselItem
+          <CarouselItemCard
             key={`${item?.id ?? index}-${index}`}
             item={item}
             index={index}
             itemWidth={itemWidth}
+            itemHeight={itemHeight}
             round={round}
             trackItemOffset={trackItemOffset}
             x={x}
-            transition={effectiveTransition}
           />
         ))}
       </motion.div>
-      <div className={`flex w-full justify-center ${round ? 'absolute z-20 bottom-12 left-1/2 -translate-x-1/2' : ''}`}>
-        <div className="mt-4 flex w-[150px] justify-between px-8">
+
+      {/* Pagination Dots */}
+      <div 
+        className="absolute left-1/2 -translate-x-1/2 z-20"
+        style={{ 
+          bottom: round ? containerPadding : 12 
+        }}
+      >
+        <div className="flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1.5 backdrop-blur-sm border border-white/10">
           {items.map((_, index) => (
-            <motion.div
+            <motion.button
               key={index}
-              className={`h-2 w-2 rounded-full cursor-pointer transition-colors duration-150 ${
+              className={`rounded-full transition-all duration-300 ${
                 activeIndex === index
-                  ? round
-                    ? 'bg-white'
-                    : 'bg-[#333333]'
-                  : round
-                    ? 'bg-[#555]'
-                    : 'bg-[rgba(51,51,51,0.4)]'
+                  ? 'w-5 h-1.5 bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.6)]'
+                  : 'w-1.5 h-1.5 bg-white/30 hover:bg-white/50'
               }`}
-              animate={{
-                scale: activeIndex === index ? 1.2 : 1
-              }}
               onClick={() => setPosition(loop ? index + 1 : index)}
-              transition={{ duration: 0.15 }}
+              whileHover={{ scale: 1.2 }}
+              whileTap={{ scale: 0.9 }}
             />
           ))}
         </div>
