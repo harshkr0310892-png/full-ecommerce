@@ -26,9 +26,30 @@ export const ContactForm = ({ className = "" }: ContactFormProps) => {
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const MIN_PHOTOS = 0;
   const MAX_PHOTOS = 6;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      setIsLoggedIn(!!data.session);
+      setAuthReady(true);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session);
+    });
+
+    return () => {
+      cancelled = true;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -195,8 +216,8 @@ export const ContactForm = ({ className = "" }: ContactFormProps) => {
     return data && data.length > 0;
   };
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+  const handlePhotoChange = (e: any) => {
+    const files: FileList | null = e?.target?.files ?? null;
     if (!files) return;
 
     const newFiles = Array.from(files);
@@ -277,8 +298,15 @@ export const ContactForm = ({ className = "" }: ContactFormProps) => {
     return photoUrls;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) {
+      toast.error("Hi, please create account to send contact form");
+      window.location.href = `/auth?redirect=${encodeURIComponent("/contact-us")}`;
+      return;
+    }
     
     if (!validateForm()) {
       return;
@@ -350,6 +378,21 @@ export const ContactForm = ({ className = "" }: ContactFormProps) => {
   return (
     <div className={`bg-card rounded-xl border border-border/50 p-6 ${className}`}>
       <h3 className="font-display text-xl font-bold mb-6">Contact Support</h3>
+      {authReady && !isLoggedIn ? (
+        <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
+          <p className="text-sm font-medium">Hi, please create account to send contact form</p>
+          <Button
+            type="button"
+            variant="royal"
+            className="mt-4"
+            onClick={() => {
+              window.location.href = `/auth?redirect=${encodeURIComponent("/contact-us")}`;
+            }}
+          >
+            Create Account / Login
+          </Button>
+        </div>
+      ) : (
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <Label htmlFor="name">Full Name *</Label>
@@ -526,6 +569,7 @@ export const ContactForm = ({ className = "" }: ContactFormProps) => {
           )}
         </Button>
       </form>
+      )}
     </div>
   );
 };
