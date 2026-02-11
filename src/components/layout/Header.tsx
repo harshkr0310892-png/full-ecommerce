@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X, ShoppingCart, Leaf, TreePine, User } from "lucide-react";
@@ -10,6 +10,7 @@ import { SearchBar } from "@/components/SearchBar";
 
 export const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const cartItems = useCartStore((state) => state.items);
   const navigate = useNavigate();
   const location = useLocation();
@@ -33,10 +34,31 @@ export const Header = () => {
     0
   );
 
-  const handleSearch = (term: string) => {
-    navigate(`/products?search=${encodeURIComponent(term)}`);
-    setMobileMenuOpen(false);
-  };
+  // Scroll detection (sirf shadow intensity change ke liye)
+  useEffect(() => {
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          setScrolled(window.scrollY > 10);
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const handleSearch = useCallback(
+    (term: string) => {
+      navigate(`/products?search=${encodeURIComponent(term)}`);
+      setMobileMenuOpen(false);
+    },
+    [navigate]
+  );
+
+  const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
 
   // Seller login via sellerEmail query param
   useEffect(() => {
@@ -60,7 +82,6 @@ export const Header = () => {
           navigate("/seller");
         }
       };
-
       verify();
     }
   }, [location.search, navigate]);
@@ -89,23 +110,29 @@ export const Header = () => {
         setSellerName(data.name);
       }
     };
-
     detectFromSession();
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 bg-transparent">
+    <header className="sticky top-0 z-50">
       <div className="container mx-auto px-2 sm:px-4 pt-2 pb-3 sm:pt-3 sm:pb-4">
-        {/* Glass card with big border-radius */}
+        {/* Glass / Card wrapper */}
         <div
           className={cn(
-            "rounded-[42px]", // ~40px radius (35–55 range)
-            "border border-white/10 dark:border-zinc-700/60",
-            // more transparent & subtle
-            "bg-white/5 dark:bg-zinc-900/70",
-            "backdrop-blur-2xl",
-            "shadow-[0_8px_24px_rgba(0,0,0,0.12)]",
-            "transition-colors duration-300",
+            "rounded-[32px] sm:rounded-[42px]",
+            "border transition-all duration-300 ease-out",
+            scrolled
+              ? "shadow-lg shadow-black/[0.06] dark:shadow-black/40"
+              : "shadow-md shadow-black/[0.04] dark:shadow-black/25",
+
+            // 📱 Mobile: semi-transparent glass
+            "bg-white/60 dark:bg-zinc-900/70 backdrop-blur-xl",
+
+            // 🖥 Desktop: solid clean card, blur off (no weird grey mix)
+            "md:bg-white md:dark:bg-zinc-900 md:backdrop-blur-none",
+
+            "border-white/40 dark:border-zinc-700/60",
+            "transform-gpu will-change-transform",
             "px-3 sm:px-5"
           )}
         >
@@ -116,7 +143,7 @@ export const Header = () => {
               to="/"
               className="flex items-center gap-2 sm:gap-3 group flex-shrink-0"
             >
-              <div className="relative w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-green-600 to-emerald-700 dark:from-green-500 dark:to-emerald-600 flex items-center justify-center shadow-md shadow-emerald-500/40">
+              <div className="relative w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-green-600 to-emerald-700 dark:from-green-500 dark:to-emerald-600 flex items-center justify-center shadow-md shadow-emerald-500/30">
                 <Leaf className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
               <span className="font-display text-lg sm:text-2xl font-bold bg-gradient-to-r from-green-700 to-emerald-800 dark:from-green-300 dark:to-emerald-300 bg-clip-text text-transparent whitespace-nowrap">
@@ -126,36 +153,41 @@ export const Header = () => {
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-8">
-              <Link
-                to="/"
-                className="font-display text-sm lg:text-base text-foreground/80 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors duration-300 relative group"
-              >
-                Home
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-green-600 to-emerald-700 dark:from-green-500 dark:to-emerald-600 transition-all duration-300 group-hover:w-full" />
-              </Link>
-              <Link
-                to="/products"
-                className="font-display text-sm lg:text-base text-foreground/80 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors duration-300 relative group"
-              >
-                Collection
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-green-600 to-emerald-700 dark:from-green-500 dark:to-emerald-600 transition-all duration-300 group-hover:w-full" />
-              </Link>
-              <Link
-                to="/contact-us"
-                className="font-display text-sm lg:text-base text-foreground/80 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors duration-300 relative group"
-              >
-                Contact Us
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-green-600 to-emerald-700 dark:from-green-500 dark:to-emerald-600 transition-all duration-300 group-hover:w-full" />
-              </Link>
+              {[
+                { to: "/", label: "Home" },
+                { to: "/products", label: "Collection" },
+                { to: "/contact-us", label: "Contact Us" },
+              ].map(({ to, label }) => (
+                <Link
+                  key={to}
+                  to={to}
+                  className={cn(
+                    "font-display text-sm lg:text-base transition-colors duration-200 relative group",
+                    location.pathname === to
+                      ? "text-emerald-700 dark:text-emerald-400"
+                      : "text-slate-800/80 dark:text-zinc-100/80 hover:text-emerald-700 dark:hover:text-emerald-400"
+                  )}
+                >
+                  {label}
+                  <span
+                    className={cn(
+                      "absolute -bottom-1 left-0 h-0.5 bg-gradient-to-r from-green-600 to-emerald-700 dark:from-green-500 dark:to-emerald-600 transition-all duration-300",
+                      location.pathname === to
+                        ? "w-full"
+                        : "w-0 group-hover:w-full"
+                    )}
+                  />
+                </Link>
+              ))}
             </nav>
 
             {/* Right side actions */}
-            <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               {/* Seller chip */}
               {sellerLoggedIn && sellerName && (
                 <Button
                   variant="ghost"
-                  className="hidden md:inline-flex h-9 rounded-full border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/15 text-xs sm:text-sm px-3"
+                  className="hidden md:inline-flex h-9 rounded-full border border-emerald-500/25 bg-emerald-500/8 hover:bg-emerald-500/15 text-xs sm:text-sm px-3 transition-colors duration-200 text-slate-900 dark:text-emerald-50"
                   onClick={() => navigate("/seller")}
                 >
                   <span className="truncate max-w-[120px]">
@@ -166,7 +198,7 @@ export const Header = () => {
 
               {/* Customer profile */}
               {isCustomerLoggedIn ? (
-                <div className="hidden md:flex items-center gap-2">
+                <div className="hidden md:flex items-center gap-1.5">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -186,7 +218,7 @@ export const Header = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-9 rounded-full border border-white/10 bg-white/5 dark:bg-zinc-800/70 hover:bg-white/10 hover:dark:bg-zinc-700/80 text-xs sm:text-sm px-3 max-w-[140px]"
+                    className="h-9 rounded-full border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 text-xs sm:text-sm px-3 max-w-[140px] transition-colors duration-200 text-slate-900 dark:text-emerald-50"
                     onClick={() => navigate("/profile")}
                   >
                     <span className="truncate">
@@ -200,7 +232,7 @@ export const Header = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="hidden md:inline-flex h-9 rounded-full border border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/15 text-xs sm:text-sm px-3"
+                  className="hidden md:inline-flex h-9 rounded-full border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm px-3 transition-colors duration-200 text-slate-900 dark:text-emerald-50"
                   onClick={() => navigate("/auth")}
                 >
                   <User className="w-4 h-4 mr-1.5" />
@@ -217,7 +249,7 @@ export const Header = () => {
                 >
                   <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
                   {cartItemCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-gradient-to-br from-green-600 to-emerald-700 dark:from-green-500 dark:to-emerald-600 text-white text-[10px] sm:text-xs rounded-full flex items-center justify-center shadow-md shadow-emerald-500/60">
+                    <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-gradient-to-br from-green-600 to-emerald-700 dark:from-green-500 dark:to-emerald-600 text-white text-[10px] sm:text-xs rounded-full flex items-center justify-center font-medium shadow-sm">
                       {cartItemCount}
                     </span>
                   )}
@@ -228,117 +260,101 @@ export const Header = () => {
               <Button
                 variant="ghost"
                 size="icon"
-                className="md:hidden rounded-full hover:bg-emerald-500/10 active:scale-95 transition-transform duration-200 will-change-transform"
+                className="md:hidden rounded-full hover:bg-emerald-500/10 transition-colors duration-200"
                 onClick={() => setMobileMenuOpen((prev) => !prev)}
               >
-                <span
-                  className={cn(
-                    "inline-flex items-center justify-center transition-transform duration-250 ease-out will-change-transform",
-                    mobileMenuOpen
-                      ? "rotate-90 scale-110"
-                      : "rotate-0 scale-100"
-                  )}
-                >
-                  {mobileMenuOpen ? (
-                    <X className="w-5 h-5 sm:w-6 sm:h-6" />
-                  ) : (
-                    <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
-                  )}
-                </span>
+                {mobileMenuOpen ? (
+                  <X className="w-5 h-5 sm:w-6 sm:h-6" />
+                ) : (
+                  <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
+                )}
               </Button>
             </div>
           </div>
 
-          {/* Mobile Navigation – smoother (no max-height animation) */}
-          <div
-            className={cn(
-              "md:hidden overflow-hidden transform-gpu will-change-transform transition-[opacity,transform] duration-220 ease-out",
-              mobileMenuOpen
-                ? "opacity-100 translate-y-0 max-h-[420px] pb-3"
-                : "opacity-0 -translate-y-1 max-h-0 pointer-events-none"
-            )}
-          >
-            <nav className="flex flex-col gap-4 mb-3 pt-1">
-              <Link
-                to="/"
-                className="font-display text-base text-foreground/85 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Home
-              </Link>
-              <Link
-                to="/products"
-                className="font-display text-base text-foreground/85 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Collection
-              </Link>
-              <Link
-                to="/contact-us"
-                className="font-display text-base text-foreground/85 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Contact Us
-              </Link>
+          {/* Mobile Navigation */}
+          {mobileMenuOpen && (
+            <div className="md:hidden border-t border-black/5 dark:border-white/5 animate-in fade-in slide-in-from-top-2 duration-200">
+              <nav className="flex flex-col gap-1 py-3">
+                {[
+                  { to: "/", label: "Home" },
+                  { to: "/products", label: "Collection" },
+                  { to: "/contact-us", label: "Contact Us" },
+                ].map(({ to, label }) => (
+                  <Link
+                    key={to}
+                    to={to}
+                    className={cn(
+                      "font-display text-base py-2 px-3 rounded-xl transition-colors duration-200",
+                      location.pathname === to
+                        ? "text-emerald-700 dark:text-emerald-400 bg-emerald-500/10"
+                        : "text-foreground/85 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-500/5"
+                    )}
+                    onClick={closeMobileMenu}
+                  >
+                    {label}
+                  </Link>
+                ))}
 
-              {sellerLoggedIn && sellerName && (
-                <Link
-                  to="/seller"
-                  className="font-display text-base text-foreground/85 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Seller: {sellerName}
-                </Link>
-              )}
+                {sellerLoggedIn && sellerName && (
+                  <Link
+                    to="/seller"
+                    className="font-display text-base py-2 px-3 rounded-xl text-foreground/85 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-500/5 transition-colors duration-200"
+                    onClick={closeMobileMenu}
+                  >
+                    Seller: {sellerName}
+                  </Link>
+                )}
 
-              {isCustomerLoggedIn ? (
-                <Link
-                  to="/profile"
-                  className="font-display text-base bg-gradient-to-r from-green-600/10 to-emerald-600/10 dark:from-green-700/25 dark:to-emerald-700/25 border border-emerald-500/60 text-black dark:text-emerald-50 py-2.5 px-4 rounded-xl hover:from-green-600/20 hover:to-emerald-600/20 dark:hover:from-green-700/35 dark:hover:to-emerald-700/35 transition-all duration-300 flex items-center gap-2 shadow-sm shadow-emerald-500/30"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {customerProfile?.avatar_url ? (
-                    <img
-                      src={customerProfile.avatar_url}
-                      alt="Profile"
-                      className="w-7 h-7 rounded-full object-cover"
-                    />
-                  ) : (
+                {isCustomerLoggedIn ? (
+                  <Link
+                    to="/profile"
+                    className="font-display text-base bg-emerald-500/10 border border-emerald-500/30 text-foreground dark:text-emerald-50 py-2.5 px-4 rounded-xl hover:bg-emerald-500/20 transition-colors duration-200 flex items-center gap-2 mt-1"
+                    onClick={closeMobileMenu}
+                  >
+                    {customerProfile?.avatar_url ? (
+                      <img
+                        src={customerProfile.avatar_url}
+                        alt="Profile"
+                        className="w-7 h-7 rounded-full object-cover"
+                      />
+                    ) : (
+                      <User className="w-4 h-4" />
+                    )}
+                    <span className="truncate">
+                      {customerProfile?.full_name ||
+                        customerUser?.email?.split("@")[0] ||
+                        "Profile"}
+                    </span>
+                  </Link>
+                ) : (
+                  <Link
+                    to="/auth"
+                    className="font-display text-base bg-emerald-500/10 border border-emerald-500/30 text-foreground dark:text-emerald-50 py-2.5 px-4 rounded-xl hover:bg-emerald-500/20 transition-colors duration-200 flex items-center gap-2 mt-1"
+                    onClick={closeMobileMenu}
+                  >
                     <User className="w-4 h-4" />
-                  )}
-                  <span className="truncate">
-                    {customerProfile?.full_name ||
-                      customerUser?.email?.split("@")[0] ||
-                      "Profile"}
-                  </span>
-                </Link>
-              ) : (
-                <Link
-                  to="/auth"
-                  className="font-display text-base bg-gradient-to-r from-green-600/10 to-emerald-600/10 dark:from-green-700/25 dark:to-emerald-700/25 border border-emerald-500/60 text-black dark:text-emerald-50 py-2.5 px-4 rounded-xl hover:from-green-600/20 hover:to-emerald-600/20 dark:hover:from-green-700/35 dark:hover:to-emerald-700/35 transition-all duration-300 flex items-center gap-2 shadow-sm shadow-emerald-500/30"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <User className="w-4 h-4" />
-                  Login
-                </Link>
-              )}
-            </nav>
+                    Login
+                  </Link>
+                )}
+              </nav>
 
-            {/* Mobile Search Bar */}
-            <div className="px-1.5">
-              <SearchBar
-                onSearch={handleSearch}
-                placeholder="Search eco products..."
-                context="collection"
-              />
-            </div>
+              {/* Mobile Search */}
+              <div className="px-1.5 pb-2">
+                <SearchBar
+                  onSearch={handleSearch}
+                  placeholder="Search eco products..."
+                  context="collection"
+                />
+              </div>
 
-            {/* Eco Badge */}
-            <div className="mt-3 px-1.5 pb-1 flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-300/90">
-              <TreePine className="w-4 h-4" />
-              <span>Sustainable & Eco-Friendly</span>
+              {/* Eco Badge */}
+              <div className="px-3 pb-3 flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-300/90">
+                <TreePine className="w-4 h-4" />
+                <span>Sustainable & Eco-Friendly</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </header>
