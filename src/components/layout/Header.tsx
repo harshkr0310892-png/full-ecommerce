@@ -93,85 +93,74 @@ export const Header = () => {
     detectFromSession();
   }, []);
 
-  // Close mobile menu when route changes
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [location.pathname]);
-
   return (
-    // Changed to fixed so content scrolls BEHIND it (essential for glass effect)
-    <header className="fixed top-0 left-0 right-0 z-50 pointer-events-none">
-      <div className="container mx-auto px-2 sm:px-4 pt-4 pb-2">
+    <header className="sticky top-0 z-50 bg-transparent">
+      <div className="container mx-auto px-2 sm:px-4 pt-2 pb-3 sm:pt-3 sm:pb-4">
+        {/* Glass card with big border-radius */}
         <div
           className={cn(
-            // --- SHAPE & POSITION ---
-            "pointer-events-auto", // Re-enable clicks
-            "rounded-full", // Cleaner pill shape
-            "px-4 sm:px-6",
-            "transition-all duration-300",
-            
-            // --- THE GLASS EFFECT (FIXED) ---
-            // Light Mode: Slightly white, very blurry
-            "bg-white/60", 
-            // Dark Mode: Dark grey/black but LOW opacity (30%)
-            "dark:bg-black/30", 
-            // The Blur: This creates the frosted glass look
-            "backdrop-blur-xl supports-[backdrop-filter]:bg-white/20",
-            
-            // --- BORDER & SHADOW ---
-            // Subtle white border for highlight
-            "border border-white/20 dark:border-white/10",
-            // Soft shadow to lift it off the page
-            "shadow-lg shadow-black/5 dark:shadow-black/20"
+            "rounded-[42px]", // ~40px radius (35–55 range)
+            "border border-white/10 dark:border-zinc-700/60",
+            // more transparent & subtle
+            "bg-white/5 dark:bg-zinc-900/70",
+            "backdrop-blur-2xl",
+            "shadow-[0_8px_24px_rgba(0,0,0,0.12)]",
+            "transition-colors duration-300",
+            "px-3 sm:px-5"
           )}
         >
           {/* Top row */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between gap-2 py-2.5 sm:py-3">
             {/* Logo */}
             <Link
               to="/"
-              className="flex items-center gap-3 group flex-shrink-0"
+              className="flex items-center gap-2 sm:gap-3 group flex-shrink-0"
             >
-              <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-600/20 group-hover:scale-105 transition-transform">
+              <div className="relative w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-green-600 to-emerald-700 dark:from-green-500 dark:to-emerald-600 flex items-center justify-center shadow-md shadow-emerald-500/40">
                 <Leaf className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
-              <span className="font-display text-lg sm:text-xl font-bold text-zinc-800 dark:text-zinc-100 whitespace-nowrap tracking-tight">
-                ecommerce<span className="hidden sm:inline text-emerald-600 dark:text-emerald-500">Store</span>
+              <span className="font-display text-lg sm:text-2xl font-bold bg-gradient-to-r from-green-700 to-emerald-800 dark:from-green-300 dark:to-emerald-300 bg-clip-text text-transparent whitespace-nowrap">
+                ecommerce<span className="hidden sm:inline"> Store</span>
               </span>
             </Link>
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-8">
-              {[
-                { name: "Home", path: "/" },
-                { name: "Collection", path: "/products" },
-                { name: "Contact Us", path: "/contact-us" },
-              ].map((link) => (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  className={cn(
-                    "text-sm font-medium transition-colors duration-200",
-                    location.pathname === link.path
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-zinc-600 dark:text-zinc-300 hover:text-emerald-600 dark:hover:text-emerald-400"
-                  )}
-                >
-                  {link.name}
-                </Link>
-              ))}
+              <Link
+                to="/"
+                className="font-display text-sm lg:text-base text-foreground/80 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors duration-300 relative group"
+              >
+                Home
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-green-600 to-emerald-700 dark:from-green-500 dark:to-emerald-600 transition-all duration-300 group-hover:w-full" />
+              </Link>
+              <Link
+                to="/products"
+                className="font-display text-sm lg:text-base text-foreground/80 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors duration-300 relative group"
+              >
+                Collection
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-green-600 to-emerald-700 dark:from-green-500 dark:to-emerald-600 transition-all duration-300 group-hover:w-full" />
+              </Link>
+              <Link
+                to="/contact-us"
+                className="font-display text-sm lg:text-base text-foreground/80 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors duration-300 relative group"
+              >
+                Contact Us
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-green-600 to-emerald-700 dark:from-green-500 dark:to-emerald-600 transition-all duration-300 group-hover:w-full" />
+              </Link>
             </nav>
 
             {/* Right side actions */}
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
               {/* Seller chip */}
               {sellerLoggedIn && sellerName && (
                 <Button
                   variant="ghost"
-                  className="hidden md:inline-flex h-9 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 text-xs px-4"
+                  className="hidden md:inline-flex h-9 rounded-full border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/15 text-xs sm:text-sm px-3"
                   onClick={() => navigate("/seller")}
                 >
-                  Seller Panel
+                  <span className="truncate max-w-[120px]">
+                    Seller: {sellerName}
+                  </span>
                 </Button>
               )}
 
@@ -180,20 +169,30 @@ export const Header = () => {
                 <div className="hidden md:flex items-center gap-2">
                   <Button
                     variant="ghost"
-                    className="h-9 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-white/10 text-zinc-700 dark:text-zinc-200 gap-2"
+                    size="icon"
                     onClick={() => navigate("/profile")}
+                    className="relative hover:bg-emerald-500/10 rounded-full transition-colors duration-200"
                   >
-                     {customerProfile?.avatar_url ? (
+                    {customerProfile?.avatar_url ? (
                       <img
                         src={customerProfile.avatar_url}
                         alt="Profile"
-                        className="w-6 h-6 rounded-full object-cover"
+                        className="w-7 h-7 rounded-full object-cover ring-2 ring-emerald-500/40"
                       />
                     ) : (
-                      <User className="w-4 h-4" />
+                      <User className="w-5 h-5" />
                     )}
-                    <span className="text-sm font-medium max-w-[100px] truncate">
-                      {customerProfile?.full_name?.split(' ')[0] || "Account"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 rounded-full border border-white/10 bg-white/5 dark:bg-zinc-800/70 hover:bg-white/10 hover:dark:bg-zinc-700/80 text-xs sm:text-sm px-3 max-w-[140px]"
+                    onClick={() => navigate("/profile")}
+                  >
+                    <span className="truncate">
+                      {customerProfile?.full_name ||
+                        customerUser?.email?.split("@")[0] ||
+                        "Customer"}
                     </span>
                   </Button>
                 </div>
@@ -201,24 +200,24 @@ export const Header = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="hidden md:inline-flex rounded-full hover:bg-zinc-100 dark:hover:bg-white/10 text-zinc-700 dark:text-zinc-200"
+                  className="hidden md:inline-flex h-9 rounded-full border border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/15 text-xs sm:text-sm px-3"
                   onClick={() => navigate("/auth")}
                 >
-                  <User className="w-4 h-4 mr-2" />
+                  <User className="w-4 h-4 mr-1.5" />
                   Login
                 </Button>
               )}
 
               {/* Cart button */}
-              <Link to="/cart">
+              <Link to="/cart" className="relative">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="rounded-full hover:bg-zinc-100 dark:hover:bg-white/10 text-zinc-700 dark:text-zinc-200 relative"
+                  className="relative rounded-full hover:bg-emerald-500/10 transition-colors duration-200"
                 >
-                  <ShoppingCart className="w-5 h-5" />
+                  <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
                   {cartItemCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-emerald-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-white dark:ring-zinc-900">
+                    <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-gradient-to-br from-green-600 to-emerald-700 dark:from-green-500 dark:to-emerald-600 text-white text-[10px] sm:text-xs rounded-full flex items-center justify-center shadow-md shadow-emerald-500/60">
                       {cartItemCount}
                     </span>
                   )}
@@ -229,92 +228,115 @@ export const Header = () => {
               <Button
                 variant="ghost"
                 size="icon"
-                className="md:hidden rounded-full hover:bg-zinc-100 dark:hover:bg-white/10 text-zinc-700 dark:text-zinc-200"
+                className="md:hidden rounded-full hover:bg-emerald-500/10 active:scale-95 transition-transform duration-200 will-change-transform"
                 onClick={() => setMobileMenuOpen((prev) => !prev)}
               >
-                {mobileMenuOpen ? (
-                  <X className="w-6 h-6" />
-                ) : (
-                  <Menu className="w-6 h-6" />
-                )}
+                <span
+                  className={cn(
+                    "inline-flex items-center justify-center transition-transform duration-250 ease-out will-change-transform",
+                    mobileMenuOpen
+                      ? "rotate-90 scale-110"
+                      : "rotate-0 scale-100"
+                  )}
+                >
+                  {mobileMenuOpen ? (
+                    <X className="w-5 h-5 sm:w-6 sm:h-6" />
+                  ) : (
+                    <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
+                  )}
+                </span>
               </Button>
             </div>
           </div>
 
-          {/* Mobile Navigation */}
+          {/* Mobile Navigation – smoother (no max-height animation) */}
           <div
             className={cn(
-              "md:hidden overflow-hidden transition-all duration-300 ease-in-out border-t border-zinc-200/50 dark:border-white/5",
-              mobileMenuOpen ? "max-h-[500px] opacity-100 pb-4 mt-2" : "max-h-0 opacity-0 mt-0"
+              "md:hidden overflow-hidden transform-gpu will-change-transform transition-[opacity,transform] duration-220 ease-out",
+              mobileMenuOpen
+                ? "opacity-100 translate-y-0 max-h-[420px] pb-3"
+                : "opacity-0 -translate-y-1 max-h-0 pointer-events-none"
             )}
           >
-            <nav className="flex flex-col gap-2 pt-4">
+            <nav className="flex flex-col gap-4 mb-3 pt-1">
               <Link
                 to="/"
-                className="px-4 py-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-700 dark:text-zinc-200 font-medium"
+                className="font-display text-base text-foreground/85 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
               >
                 Home
               </Link>
               <Link
                 to="/products"
-                className="px-4 py-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-700 dark:text-zinc-200 font-medium"
+                className="font-display text-base text-foreground/85 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
               >
                 Collection
               </Link>
               <Link
                 to="/contact-us"
-                className="px-4 py-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-700 dark:text-zinc-200 font-medium"
+                className="font-display text-base text-foreground/85 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
               >
                 Contact Us
               </Link>
 
+              {sellerLoggedIn && sellerName && (
+                <Link
+                  to="/seller"
+                  className="font-display text-base text-foreground/85 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Seller: {sellerName}
+                </Link>
+              )}
+
               {isCustomerLoggedIn ? (
-                 <Link
-                 to="/profile"
-                 className="mx-2 mt-2 px-4 py-3 rounded-xl bg-zinc-50 dark:bg-white/5 border border-zinc-100 dark:border-white/5 flex items-center gap-3"
-               >
-                 {customerProfile?.avatar_url ? (
-                   <img
-                     src={customerProfile.avatar_url}
-                     alt="Profile"
-                     className="w-8 h-8 rounded-full object-cover"
-                   />
-                 ) : (
-                   <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                     <User className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                   </div>
-                 )}
-                 <div>
-                   <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      {customerProfile?.full_name || "My Account"}
-                   </p>
-                   <p className="text-xs text-zinc-500 dark:text-zinc-400">View Profile</p>
-                 </div>
-               </Link>
+                <Link
+                  to="/profile"
+                  className="font-display text-base bg-gradient-to-r from-green-600/10 to-emerald-600/10 dark:from-green-700/25 dark:to-emerald-700/25 border border-emerald-500/60 text-black dark:text-emerald-50 py-2.5 px-4 rounded-xl hover:from-green-600/20 hover:to-emerald-600/20 dark:hover:from-green-700/35 dark:hover:to-emerald-700/35 transition-all duration-300 flex items-center gap-2 shadow-sm shadow-emerald-500/30"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  {customerProfile?.avatar_url ? (
+                    <img
+                      src={customerProfile.avatar_url}
+                      alt="Profile"
+                      className="w-7 h-7 rounded-full object-cover"
+                    />
+                  ) : (
+                    <User className="w-4 h-4" />
+                  )}
+                  <span className="truncate">
+                    {customerProfile?.full_name ||
+                      customerUser?.email?.split("@")[0] ||
+                      "Profile"}
+                  </span>
+                </Link>
               ) : (
                 <Link
                   to="/auth"
-                  className="mx-4 mt-2 py-2.5 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-medium shadow-lg shadow-emerald-600/20"
+                  className="font-display text-base bg-gradient-to-r from-green-600/10 to-emerald-600/10 dark:from-green-700/25 dark:to-emerald-700/25 border border-emerald-500/60 text-black dark:text-emerald-50 py-2.5 px-4 rounded-xl hover:from-green-600/20 hover:to-emerald-600/20 dark:hover:from-green-700/35 dark:hover:to-emerald-700/35 transition-all duration-300 flex items-center gap-2 shadow-sm shadow-emerald-500/30"
+                  onClick={() => setMobileMenuOpen(false)}
                 >
-                  Sign In / Sign Up
+                  <User className="w-4 h-4" />
+                  Login
                 </Link>
               )}
             </nav>
 
-            <div className="mt-4 px-2">
+            {/* Mobile Search Bar */}
+            <div className="px-1.5">
               <SearchBar
                 onSearch={handleSearch}
-                placeholder="Search products..."
+                placeholder="Search eco products..."
                 context="collection"
               />
             </div>
-            
-            {/* Eco Badge Mobile */}
-            <div className="mt-4 flex justify-center">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-xs font-medium text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-500/20">
-                <TreePine className="w-3 h-3" />
-                100% Sustainable
-              </span>
+
+            {/* Eco Badge */}
+            <div className="mt-3 px-1.5 pb-1 flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-300/90">
+              <TreePine className="w-4 h-4" />
+              <span>Sustainable & Eco-Friendly</span>
             </div>
           </div>
         </div>
