@@ -1,324 +1,350 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Menu, X, ShoppingCart, Leaf, TreePine, User } from "lucide-react";
-import { useCartStore } from "@/store/cartStore";
-import { cn } from "@/lib/utils";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Facebook, Twitter, Instagram, Mail, Phone, MapPin, Leaf, Recycle, TreePine, Plus, Minus, Youtube, Linkedin, Send } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useCustomerAuth } from "@/hooks/useCustomerAuth";
-import { SearchBar } from "@/components/SearchBar";
 
-export const Header = () => {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const cartItems = useCartStore((state) => state.items);
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const [sellerLoggedIn, setSellerLoggedIn] = useState<boolean>(
-    typeof window !== "undefined" &&
-      sessionStorage.getItem("seller_logged_in") === "true"
-  );
-  const [sellerName, setSellerName] = useState<string | null>(
-    typeof window !== "undefined" ? sessionStorage.getItem("seller_name") : null
-  );
-
-  const {
-    user: customerUser,
-    profile: customerProfile,
-    isLoggedIn: isCustomerLoggedIn,
-  } = useCustomerAuth();
-
-  const cartItemCount = cartItems.reduce(
-    (total, item) => total + item.quantity,
-    0
-  );
-
-  const handleSearch = (term: string) => {
-    navigate(`/products?search=${encodeURIComponent(term)}`);
-    setMobileMenuOpen(false);
+export const Footer = () => {
+  const [isQuickLinksOpen, setIsQuickLinksOpen] = useState(false);
+  const [isCommitmentOpen, setIsCommitmentOpen] = useState(false);
+  const [isContactOpen, setIsContactOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(() => {
+    // Check if user has already subscribed in local storage
+    return localStorage.getItem('newsletter_subscribed') === 'true';
+  });
+  
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!email) {
+      toast.error("Please enter your email address");
+      return;
+    }
+    
+    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+    
+    setIsSubscribing(true);
+    try {
+      const { error } = await supabase
+        .from('newsletter_subscriptions')
+        .insert([{ email }]);
+      
+      if (error) {
+        if (error.code === '23505') { // Unique violation error code
+          toast.error("You're already subscribed to our newsletter!");
+        } else {
+          toast.error("Failed to subscribe. Please try again.");
+        }
+        return;
+      }
+      
+      toast.success("Thank you for subscribing to our newsletter!");
+      setEmail("");
+      setIsSubscribed(true);
+      // Save subscription status to local storage
+      localStorage.setItem('newsletter_subscribed', 'true');
+    } catch (err) {
+      console.error('Error subscribing to newsletter:', err);
+      toast.error("An error occurred. Please try again.");
+    } finally {
+      setIsSubscribing(false);
+    }
   };
 
-  // Seller login via sellerEmail query param
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const sellerEmailParam = params.get("sellerEmail");
-
-    if (sellerEmailParam && !sessionStorage.getItem("seller_logged_in")) {
-      const verify = async () => {
-        const { data, error } = await supabase
-          .from("sellers")
-          .select("name,email,is_active,is_banned")
-          .eq("email", sellerEmailParam)
-          .maybeSingle();
-
-        if (!error && data && data.is_active && !data.is_banned) {
-          sessionStorage.setItem("seller_logged_in", "true");
-          sessionStorage.setItem("seller_email", data.email);
-          sessionStorage.setItem("seller_name", data.name);
-          setSellerLoggedIn(true);
-          setSellerName(data.name);
-          navigate("/seller");
-        }
-      };
-
-      verify();
-    }
-  }, [location.search, navigate]);
-
-  // Detect seller session from Supabase auth
-  useEffect(() => {
-    const detectFromSession = async () => {
-      if (sessionStorage.getItem("seller_logged_in") === "true") return;
-
-      const { data: sessionData } = await supabase.auth.getSession();
-      const email = sessionData?.session?.user?.email;
-      if (!email) return;
-
-      const { data, error } = await supabase
-        .from("sellers")
-        .select("id,name,email,is_active,is_banned")
-        .eq("email", email)
-        .maybeSingle();
-
-      if (!error && data && data.is_active && !data.is_banned) {
-        sessionStorage.setItem("seller_logged_in", "true");
-        sessionStorage.setItem("seller_email", data.email);
-        sessionStorage.setItem("seller_name", data.name);
-        sessionStorage.setItem("seller_id", data.id);
-        setSellerLoggedIn(true);
-        setSellerName(data.name);
-      }
-    };
-
-    detectFromSession();
-  }, []);
-
-  // Close mobile menu when route changes
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [location.pathname]);
-
   return (
-    // Changed to fixed so content scrolls BEHIND it (essential for glass effect)
-    <header className="fixed top-0 left-0 right-0 z-50 pointer-events-none">
-      <div className="container mx-auto px-2 sm:px-4 pt-4 pb-2">
-        <div
-          className={cn(
-            // --- SHAPE & POSITION ---
-            "pointer-events-auto", // Re-enable clicks
-            "rounded-full", // Cleaner pill shape
-            "px-4 sm:px-6",
-            "transition-all duration-300",
-            
-            // --- THE GLASS EFFECT (FIXED) ---
-            // Light Mode: Slightly white, very blurry
-            "bg-white/60", 
-            // Dark Mode: Dark grey/black but LOW opacity (30%)
-            "dark:bg-black/30", 
-            // The Blur: This creates the frosted glass look
-            "backdrop-blur-xl supports-[backdrop-filter]:bg-white/20",
-            
-            // --- BORDER & SHADOW ---
-            // Subtle white border for highlight
-            "border border-white/20 dark:border-white/10",
-            // Soft shadow to lift it off the page
-            "shadow-lg shadow-black/5 dark:shadow-black/20"
-          )}
-        >
-          {/* Top row */}
-          <div className="flex items-center justify-between py-3">
-            {/* Logo */}
-            <Link
-              to="/"
-              className="flex items-center gap-3 group flex-shrink-0"
-            >
-              <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-600/20 group-hover:scale-105 transition-transform">
-                <Leaf className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+    <footer 
+      className="relative text-white/90 pt-16 pb-6 px-4 border-t border-white/[0.08]"
+      style={{
+        background: `
+          radial-gradient(1200px 500px at 10% 0%, rgba(124,92,255,0.35), transparent 60%),
+          radial-gradient(900px 450px at 90% 10%, rgba(34,197,94,0.25), transparent 55%),
+          linear-gradient(180deg, #0f1833, #0b1020)
+        `
+      }}
+    >
+      <div className="max-w-[1100px] mx-auto">
+        {/* Main Footer Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1.9fr] gap-8">
+          
+          {/* Brand Card */}
+          <div className="p-5 bg-white/[0.06] border border-white/[0.12] rounded-[18px] backdrop-blur-[10px] shadow-[0_18px_55px_rgba(0,0,0,0.35)]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
+                <Leaf className="w-6 h-6 text-white" />
               </div>
-              <span className="font-display text-lg sm:text-xl font-bold text-zinc-800 dark:text-zinc-100 whitespace-nowrap tracking-tight">
-                ecommerce<span className="hidden sm:inline text-emerald-600 dark:text-emerald-500">Store</span>
-              </span>
-            </Link>
-
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-8">
-              {[
-                { name: "Home", path: "/" },
-                { name: "Collection", path: "/products" },
-                { name: "Contact Us", path: "/contact-us" },
-              ].map((link) => (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  className={cn(
-                    "text-sm font-medium transition-colors duration-200",
-                    location.pathname === link.path
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-zinc-600 dark:text-zinc-300 hover:text-emerald-600 dark:hover:text-emerald-400"
-                  )}
-                >
-                  {link.name}
-                </Link>
-              ))}
-            </nav>
-
-            {/* Right side actions */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Seller chip */}
-              {sellerLoggedIn && sellerName && (
-                <Button
-                  variant="ghost"
-                  className="hidden md:inline-flex h-9 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 text-xs px-4"
-                  onClick={() => navigate("/seller")}
-                >
-                  Seller Panel
-                </Button>
-              )}
-
-              {/* Customer profile */}
-              {isCustomerLoggedIn ? (
-                <div className="hidden md:flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    className="h-9 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-white/10 text-zinc-700 dark:text-zinc-200 gap-2"
-                    onClick={() => navigate("/profile")}
-                  >
-                     {customerProfile?.avatar_url ? (
-                      <img
-                        src={customerProfile.avatar_url}
-                        alt="Profile"
-                        className="w-6 h-6 rounded-full object-cover"
-                      />
-                    ) : (
-                      <User className="w-4 h-4" />
-                    )}
-                    <span className="text-sm font-medium max-w-[100px] truncate">
-                      {customerProfile?.full_name?.split(' ')[0] || "Account"}
-                    </span>
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="hidden md:inline-flex rounded-full hover:bg-zinc-100 dark:hover:bg-white/10 text-zinc-700 dark:text-zinc-200"
-                  onClick={() => navigate("/auth")}
-                >
-                  <User className="w-4 h-4 mr-2" />
-                  Login
-                </Button>
-              )}
-
-              {/* Cart button */}
-              <Link to="/cart">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full hover:bg-zinc-100 dark:hover:bg-white/10 text-zinc-700 dark:text-zinc-200 relative"
-                >
-                  <ShoppingCart className="w-5 h-5" />
-                  {cartItemCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-emerald-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-white dark:ring-zinc-900">
-                      {cartItemCount}
-                    </span>
-                  )}
-                </Button>
-              </Link>
-
-              {/* Mobile hamburger */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="md:hidden rounded-full hover:bg-zinc-100 dark:hover:bg-white/10 text-zinc-700 dark:text-zinc-200"
-                onClick={() => setMobileMenuOpen((prev) => !prev)}
+              <span 
+                className="font-bold text-lg tracking-wide"
+                style={{
+                  background: 'linear-gradient(90deg, #fff, rgba(255,255,255,0.8))',
+                  WebkitBackgroundClip: 'text',
+                  backgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent'
+                }}
               >
-                {mobileMenuOpen ? (
-                  <X className="w-6 h-6" />
-                ) : (
-                  <Menu className="w-6 h-6" />
-                )}
-              </Button>
+                Kiran Store
+              </span>
+            </div>
+            
+            <p className="text-white/65 text-sm leading-relaxed mb-4">
+              Your premier destination for sustainable, eco-friendly products that care for both you and the planet.
+            </p>
+            
+            <div className="flex items-center gap-2 text-xs text-emerald-400 mb-5">
+              <TreePine className="w-4 h-4" />
+              <span>Committed to sustainability & carbon neutrality</span>
+            </div>
+            
+            {/* Social Icons */}
+            <div className="flex gap-2.5 flex-wrap">
+              {[
+                { icon: Facebook, href: "#" },
+                { icon: Twitter, href: "#" },
+                { icon: Instagram, href: "#" },
+                { icon: Youtube, href: "#" },
+                { icon: Linkedin, href: "#" },
+              ].map((social, index) => (
+                <a 
+                  key={index}
+                  href={social.href} 
+                  className="w-[42px] h-[42px] rounded-xl grid place-items-center border border-white/[0.12] bg-white/[0.04] transition-all duration-200 hover:-translate-y-0.5 hover:bg-violet-500/20 hover:border-violet-500/40"
+                >
+                  <social.icon className="w-5 h-5 text-white/80" />
+                </a>
+              ))}
             </div>
           </div>
 
-          {/* Mobile Navigation */}
-          <div
-            className={cn(
-              "md:hidden overflow-hidden transition-all duration-300 ease-in-out border-t border-zinc-200/50 dark:border-white/5",
-              mobileMenuOpen ? "max-h-[500px] opacity-100 pb-4 mt-2" : "max-h-0 opacity-0 mt-0"
-            )}
-          >
-            <nav className="flex flex-col gap-2 pt-4">
-              <Link
-                to="/"
-                className="px-4 py-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-700 dark:text-zinc-200 font-medium"
-              >
-                Home
-              </Link>
-              <Link
-                to="/products"
-                className="px-4 py-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-700 dark:text-zinc-200 font-medium"
-              >
-                Collection
-              </Link>
-              <Link
-                to="/contact-us"
-                className="px-4 py-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-700 dark:text-zinc-200 font-medium"
-              >
-                Contact Us
-              </Link>
-
-              {isCustomerLoggedIn ? (
-                 <Link
-                 to="/profile"
-                 className="mx-2 mt-2 px-4 py-3 rounded-xl bg-zinc-50 dark:bg-white/5 border border-zinc-100 dark:border-white/5 flex items-center gap-3"
-               >
-                 {customerProfile?.avatar_url ? (
-                   <img
-                     src={customerProfile.avatar_url}
-                     alt="Profile"
-                     className="w-8 h-8 rounded-full object-cover"
-                   />
-                 ) : (
-                   <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                     <User className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                   </div>
-                 )}
-                 <div>
-                   <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      {customerProfile?.full_name || "My Account"}
-                   </p>
-                   <p className="text-xs text-zinc-500 dark:text-zinc-400">View Profile</p>
-                 </div>
-               </Link>
-              ) : (
-                <Link
-                  to="/auth"
-                  className="mx-4 mt-2 py-2.5 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-medium shadow-lg shadow-emerald-600/20"
-                >
-                  Sign In / Sign Up
-                </Link>
-              )}
-            </nav>
-
-            <div className="mt-4 px-2">
-              <SearchBar
-                onSearch={handleSearch}
-                placeholder="Search products..."
-                context="collection"
-              />
-            </div>
+          {/* Footer Columns */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 content-start">
             
-            {/* Eco Badge Mobile */}
-            <div className="mt-4 flex justify-center">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-xs font-medium text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-500/20">
-                <TreePine className="w-3 h-3" />
-                100% Sustainable
-              </span>
+            {/* Quick Links */}
+            <div className="p-2">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-[0.95rem] text-white/90 font-semibold tracking-wide">
+                  Quick Links
+                </h4>
+                <button 
+                  className="lg:hidden w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center transition-transform duration-300 hover:scale-110 border border-violet-500/30"
+                  onClick={() => setIsQuickLinksOpen(!isQuickLinksOpen)}
+                >
+                  {isQuickLinksOpen ? (
+                    <Minus className="w-4 h-4 text-violet-300" />
+                  ) : (
+                    <Plus className="w-4 h-4 text-violet-300" />
+                  )}
+                </button>
+              </div>
+              <div 
+                className={`flex flex-col overflow-hidden transition-all duration-500 ease-in-out ${
+                  isQuickLinksOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 lg:max-h-96 lg:opacity-100'
+                }`}
+              >
+                {['Shop Collection', 'View Cart', 'Track Order', 'Contact Us', 'FAQs', 'Privacy Policy'].map((link, index) => {
+                  // Map specific links to their correct routes
+                  let linkTo = `/${link.toLowerCase().replace(' ', '-')}`;
+                  if (link === 'FAQs') {
+                    linkTo = '/faq';
+                  } else if (link === 'Privacy Policy') {
+                    linkTo = '/privacy';
+                  } else if (link === 'Shop Collection') {
+                    linkTo = '/products';
+                  } else if (link === 'View Cart') {
+                    linkTo = '/cart';
+                  }
+                  
+                  return (
+                    <Link 
+                      key={index}
+                      to={linkTo} 
+                      className="inline-block py-1.5 text-white/65 text-sm transition-all duration-150 hover:text-white hover:translate-x-0.5"
+                    >
+                      {link}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Our Commitment */}
+            <div className="p-2">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-[0.95rem] text-white/90 font-semibold tracking-wide">
+                  Commitment
+                </h4>
+                <button 
+                  className="lg:hidden w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center transition-transform duration-300 hover:scale-110 border border-violet-500/30"
+                  onClick={() => setIsCommitmentOpen(!isCommitmentOpen)}
+                >
+                  {isCommitmentOpen ? (
+                    <Minus className="w-4 h-4 text-violet-300" />
+                  ) : (
+                    <Plus className="w-4 h-4 text-violet-300" />
+                  )}
+                </button>
+              </div>
+              <div 
+                className={`flex flex-col gap-3 overflow-hidden transition-all duration-500 ease-in-out ${
+                  isCommitmentOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 lg:max-h-96 lg:opacity-100'
+                }`}
+              >
+                {[
+                  { icon: Recycle, title: 'Zero Waste', desc: '100% recyclable packaging' },
+                  { icon: TreePine, title: 'Carbon Neutral', desc: 'Offset all emissions' },
+                  { icon: Leaf, title: 'Eco Materials', desc: 'Sustainably sourced' },
+                ].map((item, index) => (
+                  <div key={index} className="flex items-start gap-3 group">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center flex-shrink-0 group-hover:shadow-lg group-hover:shadow-emerald-500/25 transition-all">
+                      <item.icon className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white/90">{item.title}</p>
+                      <p className="text-white/50 text-xs">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Contact Info */}
+            <div className="p-2">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-[0.95rem] text-white/90 font-semibold tracking-wide">
+                  Contact Us
+                </h4>
+                <button 
+                  className="lg:hidden w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center transition-transform duration-300 hover:scale-110 border border-violet-500/30"
+                  onClick={() => setIsContactOpen(!isContactOpen)}
+                >
+                  {isContactOpen ? (
+                    <Minus className="w-4 h-4 text-violet-300" />
+                  ) : (
+                    <Plus className="w-4 h-4 text-violet-300" />
+                  )}
+                </button>
+              </div>
+              <div 
+                className={`flex flex-col gap-3 overflow-hidden transition-all duration-500 ease-in-out ${
+                  isContactOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 lg:max-h-96 lg:opacity-100'
+                }`}
+              >
+                {[
+                  { icon: Mail, title: 'Email', value: 'support@kiranstore.com' },
+                  { icon: Phone, title: 'Phone', value: '+91 9876543210' },
+                  { icon: MapPin, title: 'Address', value: '123 Green Ave, Mumbai' },
+                ].map((item, index) => (
+                  <div key={index} className="flex items-start gap-3 group">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center flex-shrink-0 group-hover:shadow-lg group-hover:shadow-violet-500/25 transition-all">
+                      <item.icon className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white/90">{item.title}</p>
+                      <p className="text-white/50 text-xs">{item.value}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Newsletter */}
+            <div className="p-2">
+              <h4 className="text-[0.95rem] text-white/90 font-semibold tracking-wide mb-3">
+                Newsletter
+              </h4>
+              {isSubscribed ? (
+                <div className="text-center">
+                  <p className="text-white/65 text-sm leading-relaxed mb-3">
+                    Thanks for subscribing us!
+                  </p>
+                  <div className="w-8 h-8 mx-auto mb-3 rounded-full bg-green-500 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                  </div>
+                  <p className="text-white/50 text-xs leading-relaxed">
+                    You're all set! Look out for our exclusive deals in your inbox.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-white/65 text-sm leading-relaxed mb-3">
+                    Subscribe for eco-tips and exclusive offers.
+                  </p>
+                  <form onSubmit={handleSubscribe} className="grid grid-cols-1 gap-2.5 mb-2.5">
+                    <input 
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Enter your email"
+                      className="w-full px-3 py-2.5 rounded-xl border border-white/[0.12] bg-black/20 text-white/90 text-sm outline-none placeholder:text-white/45 focus:border-violet-500/60 focus:shadow-[0_0_0_4px_rgba(124,92,255,0.18)] transition-all"
+                    />
+                    <button 
+                      type="submit"
+                      disabled={isSubscribing}
+                      className="w-full py-2.5 px-4 rounded-xl border border-violet-500/60 bg-gradient-to-br from-violet-500/95 to-violet-600/70 text-white font-bold text-sm cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:brightness-105 flex items-center justify-center gap-2"
+                    >
+                      {isSubscribing ? (
+                        <>
+                          <Send className="w-4 h-4 animate-spin" />
+                          Subscribing...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" />
+                          Subscribe
+                        </>
+                      )}
+                    </button>
+                  </form>
+                  <small className="text-white/50 text-xs leading-relaxed">
+                    By subscribing, you agree to our{' '}
+                    <Link to="/privacy" className="text-white/75 underline underline-offset-2 hover:text-white">
+                      Privacy Policy
+                    </Link>
+                  </small>
+                </>
+              )}
             </div>
           </div>
         </div>
+
+        {/* Footer Bottom */}
+        <div className="max-w-[1100px] mx-auto mt-7 pt-5 border-t border-white/[0.09] flex flex-col sm:flex-row items-center justify-between gap-3 text-white/50 text-sm">
+          <p>© 2024 Kiran Store. All rights reserved.</p>
+          
+          <div className="flex items-center gap-4 flex-wrap justify-center">
+            <span className="flex items-center gap-1.5 text-emerald-400">
+              <Leaf className="w-3.5 h-3.5" />
+              Plastic Free
+            </span>
+            <span className="flex items-center gap-1.5 text-violet-400">
+              <Recycle className="w-3.5 h-3.5" />
+              Recyclable
+            </span>
+            <span className="flex items-center gap-1.5 text-emerald-400">
+              <TreePine className="w-3.5 h-3.5" />
+              Carbon Neutral
+            </span>
+          </div>
+          
+          <div className="flex gap-4 flex-wrap">
+            {['Terms', 'Privacy', 'Cookies'].map((link, index) => (
+              <Link 
+                key={index}
+                to={`/${link.toLowerCase()}`} 
+                className="text-white/50 hover:text-white/90 transition-colors py-1"
+              >
+                {link}
+              </Link>
+            ))}
+          </div>
+        </div>
       </div>
-    </header>
+    </footer>
   );
 };
