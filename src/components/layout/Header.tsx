@@ -100,10 +100,11 @@ export const Header = () => {
         <div
           className={cn(
             "rounded-[42px]", // ~40px radius (35–55 range)
-            "border border-white/15 dark:border-zinc-700/70",
-            "bg-white/10 dark:bg-zinc-900/80",
+            "border border-white/10 dark:border-zinc-700/60",
+            // more transparent & subtle
+            "bg-white/5 dark:bg-zinc-900/70",
             "backdrop-blur-2xl",
-            "shadow-[0_10px_30px_rgba(0,0,0,0.18)]",
+            "shadow-[0_8px_24px_rgba(0,0,0,0.12)]",
             "transition-colors duration-300",
             "px-3 sm:px-5"
           )}
@@ -227,12 +228,12 @@ export const Header = () => {
               <Button
                 variant="ghost"
                 size="icon"
-                className="md:hidden rounded-full hover:bg-emerald-500/10 active:scale-95 transition-transform duration-200"
+                className="md:hidden rounded-full hover:bg-emerald-500/10 active:scale-95 transition-transform duration-200 will-change-transform"
                 onClick={() => setMobileMenuOpen((prev) => !prev)}
               >
                 <span
                   className={cn(
-                    "inline-flex items-center justify-center transition-transform duration-300",
+                    "inline-flex items-center justify-center transition-transform duration-250 ease-out will-change-transform",
                     mobileMenuOpen
                       ? "rotate-90 scale-110"
                       : "rotate-0 scale-100"
@@ -248,13 +249,13 @@ export const Header = () => {
             </div>
           </div>
 
-          {/* Mobile Navigation – smooth open/close */}
+          {/* Mobile Navigation – smoother (no max-height animation) */}
           <div
             className={cn(
-              "md:hidden overflow-hidden transform-gpu transition-[max-height,opacity,transform] duration-300 ease-out",
+              "md:hidden overflow-hidden transform-gpu will-change-transform transition-[opacity,transform] duration-220 ease-out",
               mobileMenuOpen
-                ? "max-h-[420px] opacity-100 translate-y-0 pb-3"
-                : "max-h-0 opacity-0 -translate-y-1 pointer-events-none"
+                ? "opacity-100 translate-y-0 max-h-[420px] pb-3"
+                : "opacity-0 -translate-y-1 max-h-0 pointer-events-none"
             )}
           >
             <nav className="flex flex-col gap-4 mb-3 pt-1">
