@@ -120,12 +120,14 @@ export const Header = () => {
         <div
           className={cn(
             "rounded-[32px] sm:rounded-[42px]",
-            "border border-white/40 dark:border-zinc-700/60",
-            "bg-transparent", // 👈 no grey / black layer
-            "backdrop-blur-2xl", // blur only, background dikh raha
+            // Light-only border (thoda strong)
+            "border border-white/60",
+            "bg-transparent",      // transparent card
+            "backdrop-blur-2xl",   // background blur
+            // Strong box shadow (scroll pe thoda aur)
             scrolled
-              ? "shadow-lg shadow-black/[0.08] dark:shadow-black/40"
-              : "shadow-md shadow-black/[0.05] dark:shadow-black/25",
+              ? "shadow-[0_20px_60px_rgba(15,23,42,0.28)]"
+              : "shadow-[0_14px_40px_rgba(15,23,42,0.22)]",
             "transform-gpu will-change-transform",
             "px-3 sm:px-5"
           )}
@@ -137,10 +139,10 @@ export const Header = () => {
               to="/"
               className="flex items-center gap-2 sm:gap-3 group flex-shrink-0"
             >
-              <div className="relative w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-green-600 to-emerald-700 dark:from-green-500 dark:to-emerald-600 flex items-center justify-center shadow-md shadow-emerald-500/30">
+              <div className="relative w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-green-600 to-emerald-700 flex items-center justify-center shadow-md shadow-emerald-500/30">
                 <Leaf className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
-              <span className="font-display text-lg sm:text-2xl font-bold bg-gradient-to-r from-green-700 to-emerald-800 dark:from-green-300 dark:to-emerald-300 bg-clip-text text-transparent whitespace-nowrap">
+              <span className="font-display text-lg sm:text-2xl font-bold bg-gradient-to-r from-green-700 to-emerald-800 bg-clip-text text-transparent whitespace-nowrap">
                 ecommerce<span className="hidden sm:inline"> Store</span>
               </span>
             </Link>
@@ -157,16 +159,16 @@ export const Header = () => {
                   to={to}
                   className={cn(
                     "font-display text-sm lg:text-base transition-colors duration-200 relative group",
-                    // 👉 light mode: always black, dark mode as before
+                    // Light theme – sab black
                     location.pathname === to
-                      ? "text-black dark:text-emerald-400"
-                      : "text-black dark:text-zinc-50/85 hover:text-black dark:hover:text-emerald-400"
+                      ? "text-black"
+                      : "text-black hover:text-black/80"
                   )}
                 >
                   {label}
                   <span
                     className={cn(
-                      "absolute -bottom-1 left-0 h-0.5 bg-gradient-to-r from-green-600 to-emerald-700 dark:from-green-500 dark:to-emerald-600 transition-all duration-300",
+                      "absolute -bottom-1 left-0 h-0.5 bg-gradient-to-r from-green-600 to-emerald-700 transition-all duration-300",
                       location.pathname === to
                         ? "w-full"
                         : "w-0 group-hover:w-full"
@@ -182,7 +184,7 @@ export const Header = () => {
               {sellerLoggedIn && sellerName && (
                 <Button
                   variant="ghost"
-                  className="hidden md:inline-flex h-9 rounded-full border border-emerald-500/25 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm px-3 transition-colors duration-200 text-slate-900 dark:text-emerald-50"
+                  className="hidden md:inline-flex h-9 rounded-full border border-emerald-500/25 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm px-3 transition-colors duration-200 text-black"
                   onClick={() => navigate("/seller")}
                 >
                   <span className="truncate max-w-[120px]">
@@ -213,8 +215,7 @@ export const Header = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    // 👉 yahan user ka naam aata hai: text-slate-900 → text-black
-                    className="h-9 rounded-full border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 text-xs sm:text-sm px-3 max-w-[140px] transition-colors duration-200 text-black dark:text-emerald-50"
+                    className="h-9 rounded-full border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 text-xs sm:text-sm px-3 max-w-[140px] transition-colors duration-200 text-black"
                     onClick={() => navigate("/profile")}
                   >
                     <span className="truncate">
@@ -228,7 +229,7 @@ export const Header = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="hidden md:inline-flex h-9 rounded-full border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm px-3 transition-colors duration-200 text-slate-900 dark:text-emerald-50"
+                  className="hidden md:inline-flex h-9 rounded-full border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm px-3 transition-colors duration-200 text-black"
                   onClick={() => navigate("/auth")}
                 >
                   <User className="w-4 h-4 mr-1.5" />
@@ -245,7 +246,7 @@ export const Header = () => {
                 >
                   <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
                   {cartItemCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-gradient-to-br from-green-600 to-emerald-700 dark:from-green-500 dark:to-emerald-600 text-white text-[10px] sm:text-xs rounded-full flex items-center justify-center font-medium shadow-sm">
+                    <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-gradient-to-br from-green-600 to-emerald-700 text-white text-[10px] sm:text-xs rounded-full flex items-center justify-center font-medium shadow-sm">
                       {cartItemCount}
                     </span>
                   )}
@@ -270,7 +271,7 @@ export const Header = () => {
 
           {/* Mobile Navigation */}
           {mobileMenuOpen && (
-            <div className="md:hidden border-t border-black/5 dark:border-white/5 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="md:hidden border-t border-black/5 animate-in fade-in slide-in-from-top-2 duration-200">
               <nav className="flex flex-col gap-1 py-3">
                 {[
                   { to: "/", label: "Home" },
@@ -283,10 +284,8 @@ export const Header = () => {
                     className={cn(
                       "font-display text-base py-2 px-3 rounded-xl transition-colors duration-200",
                       location.pathname === to
-                        ? // 👉 active mobile link: black text in light
-                          "text-black dark:text-emerald-400 bg-emerald-500/10"
-                        : // 👉 normal mobile link: black text in light
-                          "text-black/85 dark:text-foreground/85 hover:text-black dark:hover:text-emerald-400 hover:bg-emerald-500/5"
+                        ? "text-black bg-emerald-500/10"
+                        : "text-black/85 hover:text-black hover:bg-emerald-500/5"
                     )}
                     onClick={closeMobileMenu}
                   >
@@ -297,7 +296,7 @@ export const Header = () => {
                 {sellerLoggedIn && sellerName && (
                   <Link
                     to="/seller"
-                    className="font-display text-base py-2 px-3 rounded-xl text-black/85 dark:text-foreground/85 hover:text-black dark:hover:text-emerald-400 hover:bg-emerald-500/5 transition-colors duration-200"
+                    className="font-display text-base py-2 px-3 rounded-xl text-black/85 hover:text-black hover:bg-emerald-500/5 transition-colors duration-200"
                     onClick={closeMobileMenu}
                   >
                     Seller: {sellerName}
@@ -307,8 +306,7 @@ export const Header = () => {
                 {isCustomerLoggedIn ? (
                   <Link
                     to="/profile"
-                    // 👉 mobile profile text also black in light
-                    className="font-display text-base bg-emerald-500/10 border border-emerald-500/30 text-black dark:text-emerald-50 py-2.5 px-4 rounded-xl hover:bg-emerald-500/20 transition-colors duration-200 flex items-center gap-2 mt-1"
+                    className="font-display text-base bg-emerald-500/10 border border-emerald-500/30 text-black py-2.5 px-4 rounded-xl hover:bg-emerald-500/20 transition-colors duration-200 flex items-center gap-2 mt-1"
                     onClick={closeMobileMenu}
                   >
                     {customerProfile?.avatar_url ? (
@@ -329,7 +327,7 @@ export const Header = () => {
                 ) : (
                   <Link
                     to="/auth"
-                    className="font-display text-base bg-emerald-500/10 border border-emerald-500/30 text-foreground dark:text-emerald-50 py-2.5 px-4 rounded-xl hover:bg-emerald-500/20 transition-colors duration-200 flex items-center gap-2 mt-1"
+                    className="font-display text-base bg-emerald-500/10 border border-emerald-500/30 text-black py-2.5 px-4 rounded-xl hover:bg-emerald-500/20 transition-colors duration-200 flex items-center gap-2 mt-1"
                     onClick={closeMobileMenu}
                   >
                     <User className="w-4 h-4" />
@@ -348,7 +346,7 @@ export const Header = () => {
               </div>
 
               {/* Eco Badge */}
-              <div className="px-3 pb-3 flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-300/90">
+              <div className="px-3 pb-3 flex items-center gap-2 text-xs text-emerald-700">
                 <TreePine className="w-4 h-4" />
                 <span>Sustainable & Eco-Friendly</span>
               </div>
