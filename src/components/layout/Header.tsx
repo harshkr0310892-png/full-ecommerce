@@ -120,12 +120,13 @@ export const Header = () => {
         <div
           className={cn(
             "rounded-[32px] sm:rounded-[42px]",
-            "border border-white/40 dark:border-zinc-700/60",
-            "bg-transparent",              // 👈 no grey / black layer
-            "backdrop-blur-2xl",           // blur only, background dikh raha
+            // border + shadow zyada subtle, aur glassy feel
+            "border border-white/15 dark:border-zinc-700/30",
+            "bg-transparent",              // no grey / black layer
+            "backdrop-blur-2xl",           // sirf blur
             scrolled
-              ? "shadow-lg shadow-black/[0.08] dark:shadow-black/40"
-              : "shadow-md shadow-black/[0.05] dark:shadow-black/25",
+              ? "shadow-md shadow-black/[0.04] dark:shadow-black/30"
+              : "shadow-sm shadow-black/[0.02] dark:shadow-black/20",
             "transform-gpu will-change-transform",
             "px-3 sm:px-5"
           )}
