@@ -120,13 +120,12 @@ export const Header = () => {
         <div
           className={cn(
             "rounded-[32px] sm:rounded-[42px]",
-            // border + shadow zyada subtle, aur glassy feel
-            "border border-white/15 dark:border-zinc-700/30",
-            "bg-transparent",              // no grey / black layer
-            "backdrop-blur-2xl",           // sirf blur
+            "border border-white/40 dark:border-zinc-700/60",
+            "bg-transparent", // 👈 no grey / black layer
+            "backdrop-blur-2xl", // blur only, background dikh raha
             scrolled
-              ? "shadow-md shadow-black/[0.04] dark:shadow-black/30"
-              : "shadow-sm shadow-black/[0.02] dark:shadow-black/20",
+              ? "shadow-lg shadow-black/[0.08] dark:shadow-black/40"
+              : "shadow-md shadow-black/[0.05] dark:shadow-black/25",
             "transform-gpu will-change-transform",
             "px-3 sm:px-5"
           )}
@@ -158,9 +157,10 @@ export const Header = () => {
                   to={to}
                   className={cn(
                     "font-display text-sm lg:text-base transition-colors duration-200 relative group",
+                    // 👉 light mode: always black, dark mode as before
                     location.pathname === to
-                      ? "text-emerald-700 dark:text-emerald-400"
-                      : "text-slate-900/85 dark:text-zinc-50/85 hover:text-emerald-700 dark:hover:text-emerald-400"
+                      ? "text-black dark:text-emerald-400"
+                      : "text-black dark:text-zinc-50/85 hover:text-black dark:hover:text-emerald-400"
                   )}
                 >
                   {label}
@@ -213,7 +213,8 @@ export const Header = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-9 rounded-full border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 text-xs sm:text-sm px-3 max-w-[140px] transition-colors duration-200 text-slate-900 dark:text-emerald-50"
+                    // 👉 yahan user ka naam aata hai: text-slate-900 → text-black
+                    className="h-9 rounded-full border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 text-xs sm:text-sm px-3 max-w-[140px] transition-colors duration-200 text-black dark:text-emerald-50"
                     onClick={() => navigate("/profile")}
                   >
                     <span className="truncate">
@@ -282,8 +283,10 @@ export const Header = () => {
                     className={cn(
                       "font-display text-base py-2 px-3 rounded-xl transition-colors duration-200",
                       location.pathname === to
-                        ? "text-emerald-700 dark:text-emerald-400 bg-emerald-500/10"
-                        : "text-foreground/85 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-500/5"
+                        ? // 👉 active mobile link: black text in light
+                          "text-black dark:text-emerald-400 bg-emerald-500/10"
+                        : // 👉 normal mobile link: black text in light
+                          "text-black/85 dark:text-foreground/85 hover:text-black dark:hover:text-emerald-400 hover:bg-emerald-500/5"
                     )}
                     onClick={closeMobileMenu}
                   >
@@ -294,7 +297,7 @@ export const Header = () => {
                 {sellerLoggedIn && sellerName && (
                   <Link
                     to="/seller"
-                    className="font-display text-base py-2 px-3 rounded-xl text-foreground/85 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-500/5 transition-colors duration-200"
+                    className="font-display text-base py-2 px-3 rounded-xl text-black/85 dark:text-foreground/85 hover:text-black dark:hover:text-emerald-400 hover:bg-emerald-500/5 transition-colors duration-200"
                     onClick={closeMobileMenu}
                   >
                     Seller: {sellerName}
@@ -304,7 +307,8 @@ export const Header = () => {
                 {isCustomerLoggedIn ? (
                   <Link
                     to="/profile"
-                    className="font-display text-base bg-emerald-500/10 border border-emerald-500/30 text-foreground dark:text-emerald-50 py-2.5 px-4 rounded-xl hover:bg-emerald-500/20 transition-colors duration-200 flex items-center gap-2 mt-1"
+                    // 👉 mobile profile text also black in light
+                    className="font-display text-base bg-emerald-500/10 border border-emerald-500/30 text-black dark:text-emerald-50 py-2.5 px-4 rounded-xl hover:bg-emerald-500/20 transition-colors duration-200 flex items-center gap-2 mt-1"
                     onClick={closeMobileMenu}
                   >
                     {customerProfile?.avatar_url ? (
