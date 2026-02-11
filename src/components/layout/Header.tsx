@@ -34,7 +34,7 @@ export const Header = () => {
     0
   );
 
-  // Scroll detection (sirf shadow intensity change ke liye)
+  // Sirf shadow ke liye scroll detection
   useEffect(() => {
     let ticking = false;
     const handleScroll = () => {
@@ -116,22 +116,17 @@ export const Header = () => {
   return (
     <header className="sticky top-0 z-50">
       <div className="container mx-auto px-2 sm:px-4 pt-2 pb-3 sm:pt-3 sm:pb-4">
-        {/* Glass / Card wrapper */}
+        {/* Glass / Card wrapper – ALWAYS transparent (pc + mobile) */}
         <div
           className={cn(
             "rounded-[32px] sm:rounded-[42px]",
-            "border transition-all duration-300 ease-out",
+            "border border-white/30 dark:border-zinc-700/60",
+            // Light glass tint, background dikhne dega
+            "bg-white/20 dark:bg-zinc-900/70",
+            "backdrop-blur-2xl",
             scrolled
-              ? "shadow-lg shadow-black/[0.06] dark:shadow-black/40"
-              : "shadow-md shadow-black/[0.04] dark:shadow-black/25",
-
-            // 📱 Mobile: semi-transparent glass
-            "bg-white/60 dark:bg-zinc-900/70 backdrop-blur-xl",
-
-            // 🖥 Desktop: solid clean card, blur off (no weird grey mix)
-            "md:bg-white md:dark:bg-zinc-900 md:backdrop-blur-none",
-
-            "border-white/40 dark:border-zinc-700/60",
+              ? "shadow-lg shadow-black/[0.08] dark:shadow-black/40"
+              : "shadow-md shadow-black/[0.05] dark:shadow-black/25",
             "transform-gpu will-change-transform",
             "px-3 sm:px-5"
           )}
@@ -165,7 +160,7 @@ export const Header = () => {
                     "font-display text-sm lg:text-base transition-colors duration-200 relative group",
                     location.pathname === to
                       ? "text-emerald-700 dark:text-emerald-400"
-                      : "text-slate-800/80 dark:text-zinc-100/80 hover:text-emerald-700 dark:hover:text-emerald-400"
+                      : "text-slate-900/85 dark:text-zinc-50/85 hover:text-emerald-700 dark:hover:text-emerald-400"
                   )}
                 >
                   {label}
@@ -187,7 +182,7 @@ export const Header = () => {
               {sellerLoggedIn && sellerName && (
                 <Button
                   variant="ghost"
-                  className="hidden md:inline-flex h-9 rounded-full border border-emerald-500/25 bg-emerald-500/8 hover:bg-emerald-500/15 text-xs sm:text-sm px-3 transition-colors duration-200 text-slate-900 dark:text-emerald-50"
+                  className="hidden md:inline-flex h-9 rounded-full border border-emerald-500/25 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm px-3 transition-colors duration-200 text-slate-900 dark:text-emerald-50"
                   onClick={() => navigate("/seller")}
                 >
                   <span className="truncate max-w-[120px]">
