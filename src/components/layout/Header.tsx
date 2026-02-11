@@ -116,14 +116,13 @@ export const Header = () => {
   return (
     <header className="sticky top-0 z-50">
       <div className="container mx-auto px-2 sm:px-4 pt-2 pb-3 sm:pt-3 sm:pb-4">
-        {/* Glass / Card wrapper – ALWAYS transparent (pc + mobile) */}
+        {/* Wrapper – PURE transparent (pc + mobile) */}
         <div
           className={cn(
             "rounded-[32px] sm:rounded-[42px]",
-            "border border-white/30 dark:border-zinc-700/60",
-            // Light glass tint, background dikhne dega
-            "bg-white/20 dark:bg-zinc-900/70",
-            "backdrop-blur-2xl",
+            "border border-white/40 dark:border-zinc-700/60",
+            "bg-transparent",              // 👈 no grey / black layer
+            "backdrop-blur-2xl",           // blur only, background dikh raha
             scrolled
               ? "shadow-lg shadow-black/[0.08] dark:shadow-black/40"
               : "shadow-md shadow-black/[0.05] dark:shadow-black/25",
