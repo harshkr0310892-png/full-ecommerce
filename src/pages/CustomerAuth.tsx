@@ -149,9 +149,17 @@ export default function CustomerAuth() {
     }
   };
 
+  // Common input style (glassmorphism, white text)
+  const glassInputClass =
+    "h-11 w-full rounded-lg border border-white/20 bg-white/5 " +
+    "pl-11 pr-10 text-sm text-slate-50 placeholder:text-slate-400 " +
+    "shadow-inner shadow-black/40 backdrop-blur-md " +
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 " +
+    "focus-visible:border-amber-300/80";
+
   return (
     <Layout>
-      {/* Static gradient background (no animation = smoother on mobile) */}
+      {/* Static gradient background */}
       <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
         {/* Soft static radial highlights */}
         <div className="pointer-events-none absolute inset-0">
@@ -165,10 +173,8 @@ export default function CustomerAuth() {
             {/* Brand / Logo */}
             <div className="mb-8 text-center">
               <div className="relative mx-auto mb-6 inline-block">
-                {/* Glow ring (no animation) */}
-                <div className="absolute inset-0 h-20 w-20 rounded-full bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-400 blur-xl opacity-40" />
-                {/* Main icon container */}
-                <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-600 shadow-2xl shadow-amber-500/40 ring-2 ring-amber-300/40">
+                <div className="absolute inset-0 h-20 w-20 rounded-full bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-400 blur-xl opacity-50 animate-pulse" />
+                <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-600 shadow-2xl shadow-amber-500/40 ring-2 ring-amber-300/60">
                   <Crown className="h-10 w-10 text-white drop-shadow-lg" />
                   <Sparkles className="absolute -top-1 -right-1 h-4 w-4 text-amber-200" />
                 </div>
@@ -177,7 +183,7 @@ export default function CustomerAuth() {
               <h1 className="font-display bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-100 bg-clip-text text-3xl sm:text-4xl font-bold text-transparent">
                 {isLogin ? "Welcome Back" : "Join the Elite"}
               </h1>
-              <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-muted-foreground/80">
+              <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-slate-300/80">
                 {isLogin
                   ? "Sign in to access your exclusive orders and premium profile."
                   : "Create your account to unlock premium features and track orders."}
@@ -186,24 +192,27 @@ export default function CustomerAuth() {
 
             {/* Glass card */}
             <div className="relative">
-              {/* Light border glow */}
-              <div className="absolute -inset-[1px] rounded-2xl bg-[linear-gradient(135deg,rgba(251,191,36,0.4),rgba(250,250,250,0.08),rgba(251,146,60,0.35))] opacity-60 blur-[2px]" />
+              {/* Animated border glow wrapper */}
+              <div className="absolute -inset-[1px] rounded-2xl bg-[conic-gradient(at_top,_rgba(251,191,36,0.7),_rgba(15,23,42,0.7),_rgba(251,146,60,0.9),_rgba(15,23,42,0.7),_rgba(251,191,36,0.7))] opacity-70 blur-[2px] animate-pulse" />
 
-              <div className="relative rounded-2xl border border-white/12 bg-white/6 shadow-[0_18px_50px_rgba(0,0,0,0.7)] backdrop-blur-2xl">
+              <div className="relative rounded-2xl border border-white/15 bg-slate-950/30 shadow-[0_18px_50px_rgba(0,0,0,0.8)] backdrop-blur-3xl transition-transform duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_60px_rgba(0,0,0,0.9)]">
                 {/* Soft inner overlay */}
-                <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-b from-white/10 via-transparent to-transparent" />
+                <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-b from-white/10 via-transparent to-black/10" />
 
                 <div className="relative z-10 p-6 sm:p-7">
+                  {/* Top animated accent line */}
+                  <div className="mb-4 h-px w-full bg-gradient-to-r from-transparent via-amber-300/70 to-transparent animate-pulse" />
+
                   {/* Toggle buttons */}
-                  <div className="mb-6 flex rounded-xl border border-white/10 bg-black/25 p-1.5 backdrop-blur-sm">
+                  <div className="mb-6 flex rounded-xl border border-white/12 bg-black/40 p-1.5 backdrop-blur-sm">
                     <button
                       type="button"
                       onClick={() => setIsLogin(true)}
                       className={cn(
-                        "flex-1 rounded-lg py-2.5 text-sm font-semibold transition-colors",
+                        "flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all duration-200",
                         isLogin
                           ? "bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-md shadow-amber-500/40"
-                          : "text-muted-foreground/75 hover:bg-white/5 hover:text-muted-foreground"
+                          : "text-slate-300/80 hover:bg-white/5 hover:text-slate-100"
                       )}
                     >
                       Sign In
@@ -212,10 +221,10 @@ export default function CustomerAuth() {
                       type="button"
                       onClick={() => setIsLogin(false)}
                       className={cn(
-                        "flex-1 rounded-lg py-2.5 text-sm font-semibold transition-colors",
+                        "flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all duration-200",
                         !isLogin
                           ? "bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-md shadow-amber-500/40"
-                          : "text-muted-foreground/75 hover:bg-white/5 hover:text-muted-foreground"
+                          : "text-slate-300/80 hover:bg:white/5 hover:text-slate-100"
                       )}
                     >
                       Sign Up
@@ -224,17 +233,17 @@ export default function CustomerAuth() {
 
                   {/* Form */}
                   <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* Full Name (only signup, no animation / height transition) */}
+                    {/* Full Name (signup only) */}
                     {!isLogin && (
                       <div>
                         <Label
                           htmlFor="fullName"
-                          className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted-foreground/70"
+                          className="mb-2 block text-xs font-medium uppercase tracking-wider text-slate-300/80"
                         >
                           Full Name
                         </Label>
                         <div className="relative flex items-center">
-                          <div className="absolute left-0 top-0 flex h-11 w-10 items-center justify-center rounded-l-lg border-r border-white/10 bg-white/8">
+                          <div className="absolute left-0 top-0 flex h-11 w-10 items-center justify-center rounded-l-lg border-r border-white/10 bg-white/10">
                             <User className="h-4 w-4 text-amber-200/90" />
                           </div>
                           <Input
@@ -242,7 +251,7 @@ export default function CustomerAuth() {
                             value={formData.fullName}
                             onChange={handleChange("fullName")}
                             placeholder="Enter your full name"
-                            className="h-11 w-full rounded-lg border border-white/14 bg-black/45 pl-11 text-sm text-foreground placeholder:text-muted-foreground/55 shadow-inner shadow-black/40 backdrop-blur-md focus:border-amber-400/70 focus:ring-amber-400/30"
+                            className={cn(glassInputClass, "pl-11 pr-3")}
                           />
                         </div>
                       </div>
@@ -252,12 +261,12 @@ export default function CustomerAuth() {
                     <div>
                       <Label
                         htmlFor="email"
-                        className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted-foreground/70"
+                        className="mb-2 block text-xs font-medium uppercase tracking-wider text-slate-300/80"
                       >
                         Email Address
                       </Label>
                       <div className="relative flex items-center">
-                        <div className="absolute left-0 top-0 flex h-11 w-10 items-center justify-center rounded-l-lg border-r border-white/10 bg-white/8">
+                        <div className="absolute left-0 top-0 flex h-11 w-10 items-center justify-center rounded-l-lg border-r border-white/10 bg-white/10">
                           <Mail className="h-4 w-4 text-amber-200/90" />
                         </div>
                         <Input
@@ -266,7 +275,7 @@ export default function CustomerAuth() {
                           value={formData.email}
                           onChange={handleChange("email")}
                           placeholder="Enter your email"
-                          className="h-11 w-full rounded-lg border border-white/14 bg-black/45 pl-11 text-sm text-foreground placeholder:text-muted-foreground/55 shadow-inner shadow-black/40 backdrop-blur-md focus:border-amber-400/70 focus:ring-amber-400/30"
+                          className={cn(glassInputClass, "pl-11")}
                         />
                       </div>
                     </div>
@@ -275,12 +284,12 @@ export default function CustomerAuth() {
                     <div>
                       <Label
                         htmlFor="password"
-                        className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted-foreground/70"
+                        className="mb-2 block text-xs font-medium uppercase tracking-wider text-slate-300/80"
                       >
                         Password
                       </Label>
                       <div className="relative flex items-center">
-                        <div className="absolute left-0 top-0 flex h-11 w-10 items-center justify-center rounded-l-lg border-r border-white/10 bg-white/8">
+                        <div className="absolute left-0 top-0 flex h-11 w-10 items-center justify-center rounded-l-lg border-r border-white/10 bg-white/10">
                           <Lock className="h-4 w-4 text-amber-200/90" />
                         </div>
                         <Input
@@ -290,12 +299,12 @@ export default function CustomerAuth() {
                           onChange={handleChange("password")}
                           placeholder="Enter your password"
                           minLength={6}
-                          className="h-11 w-full rounded-lg border border-white/14 bg-black/45 pl-11 pr-10 text-sm text-foreground placeholder:text-muted-foreground/55 shadow-inner shadow-black/40 backdrop-blur-md focus:border-amber-400/70 focus:ring-amber-400/30"
+                          className={cn(glassInputClass, "pl-11 pr-9")}
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword((prev) => !prev)}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/55 hover:text-amber-200 transition-colors"
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300/80 hover:text-amber-200 transition-colors"
                         >
                           {showPassword ? (
                             <EyeOff className="h-4 w-4" />
@@ -310,13 +319,13 @@ export default function CustomerAuth() {
                           <button
                             type="button"
                             onClick={() => navigate("/forgot-password")}
-                            className="text-xs text-amber-300/80 underline-offset-2 hover:text-amber-200 hover:underline transition-colors"
+                            className="text-xs text-amber-300/90 underline-offset-2 hover:text-amber-200 hover:underline transition-colors"
                           >
                             Forgot password?
                           </button>
                         </div>
                       ) : (
-                        <p className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground/55">
+                        <p className="mt-2 flex items-center gap-1 text-[11px] text-slate-400/85">
                           <Lock className="h-3 w-3" />
                           Minimum 6 characters required
                         </p>
@@ -329,7 +338,7 @@ export default function CustomerAuth() {
                         type="submit"
                         size="lg"
                         disabled={isLoading}
-                        className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border-0 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-500 text-sm font-semibold text-white shadow-lg shadow-amber-600/40 transition-all duration-200 hover:brightness-110 disabled:opacity-70"
+                        className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border-0 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-500 text-sm font-semibold text-white shadow-lg shadow-amber-600/50 transition-all duration-200 hover:brightness-110 disabled:opacity-70"
                       >
                         <span className="flex items-center gap-2">
                           {isLoading ? (
@@ -355,7 +364,7 @@ export default function CustomerAuth() {
                         <div className="w-full border-t border-white/12" />
                       </div>
                       <div className="relative flex justify-center">
-                        <span className="bg-transparent px-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground/55">
+                        <span className="bg-slate-950/80 px-3 text-[11px] uppercase tracking-[0.18em] text-slate-400/80">
                           Or continue with
                         </span>
                       </div>
@@ -368,7 +377,7 @@ export default function CustomerAuth() {
                     variant="outline"
                     size="lg"
                     onClick={handleGoogleSignIn}
-                    className="flex h-11 w-full items-center justify-center gap-3 rounded-lg border border-white/16 bg-black/45 text-sm font-medium text-muted-foreground/85 shadow-inner shadow-black/40 backdrop-blur-md transition-all duration-200 hover:bg-black/35 hover:text-foreground"
+                    className="flex h-11 w-full items-center justify-center gap-3 rounded-lg border border-white/18 bg-black/55 text-sm font-medium text-slate-100 shadow-inner shadow-black/40 backdrop-blur-md transition-all duration-200 hover:bg-black/45 hover:text-white"
                   >
                     <svg
                       className="h-5 w-5"
@@ -396,13 +405,13 @@ export default function CustomerAuth() {
                   </Button>
 
                   {/* Footer */}
-                  <p className="mt-4 text-center text-[11px] leading-relaxed text-muted-foreground/45">
+                  <p className="mt-4 text-center text-[11px] leading-relaxed text-slate-400/80">
                     By continuing, you agree to our{" "}
-                    <button className="text-amber-300/80 underline underline-offset-2 hover:text-amber-200 transition-colors">
+                    <button className="text-amber-300/90 underline underline-offset-2 hover:text-amber-200 transition-colors">
                       Terms of Service
                     </button>{" "}
                     and{" "}
-                    <button className="text-amber-300/80 underline underline-offset-2 hover:text-amber-200 transition-colors">
+                    <button className="text-amber-300/90 underline underline-offset-2 hover:text-amber-200 transition-colors">
                       Privacy Policy
                     </button>
                     .
