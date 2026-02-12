@@ -23,7 +23,7 @@ function json(data: unknown, init: ResponseInit = {}) {
   });
 }
 
-type IncomingMessage = { role: string; content: string; imageUrl?: string };
+type IncomingMessage = { role: string; content: string; images?: string[] };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -46,9 +46,17 @@ function parseMessages(value: unknown): IncomingMessage[] | null {
     if (!isRecord(m)) return null;
     const role = typeof m.role === "string" ? m.role : "";
     const content = typeof m.content === "string" ? m.content : "";
-    const imageUrl = typeof m.imageUrl === "string" ? m.imageUrl : undefined;
+    
+    // Handle both old single 'imageUrl' and new 'images' array
+    let images: string[] = [];
+    if (Array.isArray(m.images)) {
+      images = m.images.filter((img): img is string => typeof img === "string");
+    } else if (typeof m.imageUrl === "string") {
+      images = [m.imageUrl];
+    }
+
     if (!role || !content) return null;
-    out.push({ role, content, imageUrl });
+    out.push({ role, content, images });
   }
   return out;
 }
@@ -269,16 +277,21 @@ Deno.serve(async (req: Request) => {
       const parts: Array<{ text?: string; inline_data?: { mime_type: string; data: string } }> = [];
       parts.push({ text: msg.content });
 
-      if (msg.imageUrl && msg.imageUrl.startsWith("data:image")) {
-        const [header, base64Data] = msg.imageUrl.split(",", 2);
-        if (header && base64Data) {
-          const mimeType = header.match(/:(.*?);/)?.[1] || "image/jpeg";
-          parts.push({
-            inline_data: {
-              mime_type: mimeType,
-              data: base64Data,
-            },
-          });
+      // Handle multiple images
+      if (msg.images && msg.images.length > 0) {
+        for (const imgUrl of msg.images) {
+          if (imgUrl.startsWith("data:image")) {
+            const [header, base64Data] = imgUrl.split(",", 2);
+            if (header && base64Data) {
+              const mimeType = header.match(/:(.*?);/)?.[1] || "image/jpeg";
+              parts.push({
+                inline_data: {
+                  mime_type: mimeType,
+                  data: base64Data,
+                },
+              });
+            }
+          }
         }
       }
 
