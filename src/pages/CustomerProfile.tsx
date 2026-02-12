@@ -19,8 +19,10 @@ import { toast } from "sonner";
 import { 
   Crown, Home, Loader2, User, Phone, MapPin, Package, 
   Clock, CheckCircle, Truck, XCircle, LogOut, Camera,
-  Edit2, Save, X, ChevronDown, ChevronUp, Sparkles, Shield, Star, Heart, Copy
+  Edit2, Save, X, ChevronDown, ChevronUp, Sparkles, Shield, Star, Heart, Copy, StopCircle
 } from "lucide-react";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -346,6 +348,63 @@ const royalStyles = `
     background: linear-gradient(145deg, rgba(26, 26, 46, 0.98) 0%, rgba(22, 33, 62, 0.98) 100%);
     border: 1px solid rgba(212, 175, 55, 0.3);
     box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5), 0 0 40px rgba(212, 175, 55, 0.1);
+  }
+
+  /* Markdown Content Styles */
+  .markdown-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  .markdown-content th {
+    background: rgba(212, 175, 55, 0.1);
+    color: #D4AF37;
+    font-weight: 600;
+    text-align: left;
+    padding: 12px;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+  }
+  
+  .markdown-content td {
+    padding: 12px;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+    color: #e0e0e0;
+  }
+  
+  .markdown-content tr:last-child td {
+    border-bottom: none;
+  }
+  
+  .markdown-content p {
+    margin-bottom: 0.75rem;
+  }
+  
+  .markdown-content p:last-child {
+    margin-bottom: 0;
+  }
+  
+  .markdown-content ul, .markdown-content ol {
+    margin-left: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .markdown-content li {
+    margin-bottom: 0.25rem;
+  }
+  
+  .markdown-content strong {
+    color: #D4AF37;
+    font-weight: 600;
+  }
+  
+  .markdown-content a {
+    color: #D4AF37;
+    text-decoration: underline;
   }
 `;
 
@@ -1787,12 +1846,13 @@ export default function CustomerProfile() {
 
 // Chatbot Component with Royal Theme
 const ChatbotComponent = () => {
-  const [messages, setMessages] = useState<Array<{id: string; text: string; sender: 'user' | 'bot'; timestamp: Date; imageUrl?: string}>>([
+  const [messages, setMessages] = useState<Array<{id: string; text: string; sender: 'user' | 'bot'; timestamp: Date; imageUrl?: string; images?: string[]}>>([
     { id: '1', text: "Hi! I'm your AI assistant. You can talk to me in English, Hindi, ya Hinglish.", sender: 'bot', timestamp: new Date() }
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [webSearchEnabled, setWebSearchEnabled] = useState(() => {
     try {
       const v = localStorage.getItem('cp_ai_web_search');
@@ -1809,7 +1869,7 @@ const ChatbotComponent = () => {
     }>;
   };
 
-  const callCustomerProfileAi = async (messagesPayload: unknown) => {
+  const callCustomerProfileAi = async (messagesPayload: unknown, signal?: AbortSignal) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) {
       throw new Error("Session expired. Please login again.");
@@ -1821,23 +1881,21 @@ const ChatbotComponent = () => {
       accessToken = refreshed?.data?.session?.access_token ?? accessToken;
     }
 
-    const { data, error } = await supabase.functions.invoke("customer-profile-ai", {
-      body: messagesPayload,
+    // Use fetch directly to support signal
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/customer-profile-ai`, {
+      method: 'POST',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
       },
+      body: JSON.stringify(messagesPayload),
+      signal,
     });
 
-    if (error) {
-      const ctx = (error as unknown as { context?: Response } | null)?.context;
-      const statusPart = ctx ? ` (${ctx.status})` : "";
-      const bodyText = ctx ? await ctx.clone().text().catch(() => "") : "";
-      const bodyPart = bodyText.trim() ? `: ${bodyText}` : "";
-      throw new Error((error.message || "AI request failed") + statusPart + bodyPart);
-    }
+    const data = await response.json();
 
-    if ((data as { error?: string } | null)?.error) {
-      throw new Error((data as { error: string }).error);
+    if (!response.ok) {
+      throw new Error(data.error || "AI request failed");
     }
 
     return data;
@@ -1850,20 +1908,8 @@ const ChatbotComponent = () => {
   };
 
   const cleanAiText = (text: string) => {
-    let t = text;
-    t = t.replace(/\r\n/g, '\n');
-    t = t.replace(/```[a-zA-Z0-9_-]*\n([\s\S]*?)```/g, '$1');
-    t = t.replace(/```/g, '');
-    t = t.replace(/^\s*#{1,6}\s+/gm, '');
-    t = t.replace(/^\s*>\s+/gm, '');
-    t = t.replace(/^\s*\*\s+/gm, '- ');
-    t = t.replace(/^\s*-\s+/gm, '- ');
-    t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1');
-    t = t.replace(/`([^`]+)`/g, '$1');
-    t = t.replace(/\*\*/g, '');
-    t = t.replace(/__/g, '');
-    t = t.replace(/`/g, '');
-    return t.trim();
+    // No need to strip markdown as we are using ReactMarkdown
+    return text.trim();
   };
 
   const scrollToBottom = () => {
@@ -1874,13 +1920,27 @@ const ChatbotComponent = () => {
     scrollToBottom();
   }, [messages]);
 
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsLoading(false);
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        text: "[Generation stopped by user]",
+        sender: 'bot' as const,
+        timestamp: new Date()
+      }]);
+    }
+  };
+
   const handleSendMessage = async () => {
-    if ((!inputMessage.trim() && !uploadedImage) || isLoading) return;
+    if ((!inputMessage.trim() && uploadedImages.length === 0) || isLoading) return;
 
     let messageToSend = inputMessage;
     
-    if (uploadedImage) {
-      messageToSend = messageToSend + (messageToSend ? ' ' : '') + '[Attached image]';
+    if (uploadedImages.length > 0) {
+      messageToSend = messageToSend + (messageToSend ? ' ' : '') + `[Attached ${uploadedImages.length} image(s)]`;
     }
 
     const userMessage = {
@@ -1888,23 +1948,27 @@ const ChatbotComponent = () => {
       text: messageToSend,
       sender: 'user' as const,
       timestamp: new Date(),
-      imageUrl: uploadedImage || undefined
+      images: uploadedImages.length > 0 ? [...uploadedImages] : undefined,
+      imageUrl: uploadedImages.length > 0 ? uploadedImages[0] : undefined // Backwards compatibility
     };
     
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
-    setUploadedImage(null);
+    setUploadedImages([]);
     setIsLoading(true);
+
+    // Create new AbortController
+    abortControllerRef.current = new AbortController();
 
     try {
       const apiMessages = [
-        { role: 'system', content: 'You are a helpful, friendly assistant. Reply in the same language as the user (English, Hindi, or Hinglish). Keep the tone normal and casual. Avoid royal/servant-style language. Keep responses clear and not too long.', imageUrl: undefined },
+        { role: 'system', content: 'You are a helpful, friendly assistant. Reply in the same language as the user (English, Hindi, or Hinglish). Keep the tone normal and casual. Avoid royal/servant-style language. Keep responses clear and not too long. If the user asks for a table, format it using standard Markdown tables.', imageUrl: undefined },
         ...messages.map(msg => ({
           role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
           content: msg.text,
-          imageUrl: msg.imageUrl
+          images: msg.images || (msg.imageUrl ? [msg.imageUrl] : undefined)
         })),
-        { role: 'user', content: messageToSend, imageUrl: uploadedImage || undefined }
+        { role: 'user', content: messageToSend, images: userMessage.images }
       ];
 
       try {
@@ -1916,7 +1980,7 @@ const ChatbotComponent = () => {
         model: "gemini-3-flash-preview",
         temperature: 0.1,
         web_search: webSearchEnabled,
-      });
+      }, abortControllerRef.current.signal);
 
       const botResponseRaw = extractGeminiText(data) || "Sorry, I couldn't process that. Please try again.";
       const botResponse = cleanAiText(botResponseRaw);
@@ -1929,7 +1993,11 @@ const ChatbotComponent = () => {
       };
       
       setMessages(prev => [...prev, botMessage]);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log('Request aborted');
+        return;
+      }
       console.error('Error with chatbot:', error);
       const msg = error instanceof Error ? error.message : "Unknown error";
       const errorMessage = {
@@ -1941,25 +2009,46 @@ const ChatbotComponent = () => {
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const remainingSlots = 5 - uploadedImages.length;
+    if (files.length > remainingSlots) {
+      toast.error(`You can only upload ${remainingSlots} more image(s). Max 5 images allowed.`);
+      // We process only the allowed number of files
+    }
+    
+    const filesToProcess = Array.from(files).slice(0, remainingSlots);
+
+    filesToProcess.forEach(file => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setUploadedImage(reader.result as string);
+        setUploadedImages(prev => {
+          if (prev.length >= 5) return prev;
+          return [...prev, reader.result as string];
+        });
       };
       reader.readAsDataURL(file);
-    }
+    });
+    
+    // Reset input so same files can be selected again if needed
+    e.target.value = '';
+  };
+
+  const removeUploadedImage = (index: number) => {
+    setUploadedImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const clearChat = () => {
     setMessages([
       { id: '1', text: "Hi! I'm your AI assistant. You can talk to me in English, Hindi, ya Hinglish.", sender: 'bot', timestamp: new Date() }
     ]);
-    setUploadedImage(null);
+    setUploadedImages([]);
   };
 
   const tellJoke = async () => {
@@ -1981,7 +2070,7 @@ const ChatbotComponent = () => {
         ...messages.map(msg => ({
           role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
           content: msg.text,
-          imageUrl: msg.imageUrl
+          images: msg.images || (msg.imageUrl ? [msg.imageUrl] : undefined)
         })),
         { role: 'user', content: 'Tell me a joke', imageUrl: undefined }
       ];
@@ -2068,19 +2157,27 @@ const ChatbotComponent = () => {
                   : 'chat-message-bot rounded-bl-sm text-white'
               )}
             >
-              <div className="whitespace-pre-wrap break-words">
-                {message.text}
+              <div className="markdown-content break-words">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {message.text}
+                </ReactMarkdown>
               </div>
               
-              {message.imageUrl && (
-                <div className="mt-2 flex justify-center">
-                  <img 
-                    src={message.imageUrl} 
-                    alt="Uploaded for chat" 
-                    className="max-h-32 max-w-xs object-contain rounded border border-amber-400/20" 
-                  />
+              {/* Display Images */}
+              {(message.images && message.images.length > 0) || message.imageUrl ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(message.images || [message.imageUrl]).map((img, idx) => (
+                    img && (
+                      <img 
+                        key={idx}
+                        src={img} 
+                        alt={`Uploaded ${idx + 1}`} 
+                        className="max-h-32 max-w-xs object-contain rounded border border-amber-400/20" 
+                      />
+                    )
+                  ))}
                 </div>
-              )}
+              ) : null}
               
               <div className={cn(
                 "text-xs mt-2",
@@ -2093,7 +2190,7 @@ const ChatbotComponent = () => {
         ))}
         
         {isLoading && (
-          <div className="flex justify-start">
+          <div className="flex justify-start items-center gap-3">
             <div className="chat-message-bot rounded-2xl rounded-bl-sm px-4 py-3 max-w-[80%]">
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 bg-amber-400 rounded-full animate-bounce"></div>
@@ -2101,28 +2198,39 @@ const ChatbotComponent = () => {
                 <div className="h-2 w-2 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
             </div>
+            <button
+              onClick={handleStopGeneration}
+              className="p-2 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
+              title="Stop generating"
+            >
+              <StopCircle className="w-5 h-5" />
+            </button>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
       
       {/* Image Preview */}
-      {uploadedImage && (
-        <div className="mb-3 flex items-center gap-3">
-          <span className="text-gray-400 text-sm">Attached:</span>
-          <div className="relative">
-            <img 
-              src={uploadedImage} 
-              alt="Preview" 
-              className="w-16 h-16 object-cover rounded-lg border border-amber-400/30" 
-            />
-            <button 
-              type="button" 
-              onClick={() => setUploadedImage(null)}
-              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
-            >
-              ×
-            </button>
+      {uploadedImages.length > 0 && (
+        <div className="mb-3">
+          <span className="text-gray-400 text-sm mb-2 block">Attached ({uploadedImages.length}/5):</span>
+          <div className="flex gap-2 overflow-x-auto pb-2 royal-scrollbar">
+            {uploadedImages.map((img, idx) => (
+              <div key={idx} className="relative flex-shrink-0">
+                <img 
+                  src={img} 
+                  alt={`Preview ${idx + 1}`} 
+                  className="w-16 h-16 object-cover rounded-lg border border-amber-400/30" 
+                />
+                <button 
+                  type="button" 
+                  onClick={() => removeUploadedImage(idx)}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600 shadow-md"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -2141,8 +2249,8 @@ const ChatbotComponent = () => {
           />
           <button 
             type="button"
-            disabled={isLoading}
-            className="royal-btn-outline h-12 w-12 rounded-lg flex items-center justify-center"
+            disabled={isLoading || uploadedImages.length >= 5}
+            className={`royal-btn-outline h-12 w-12 rounded-lg flex items-center justify-center ${uploadedImages.length >= 5 ? 'opacity-50 cursor-not-allowed' : ''}`}
             onClick={() => document.getElementById('chatbot-image-upload')?.click()}
           >
             <Camera className="w-5 h-5" />
@@ -2150,15 +2258,16 @@ const ChatbotComponent = () => {
           <input
             id="chatbot-image-upload"
             type="file"
+            multiple
             accept="image/*"
             onChange={handleImageUpload}
             className="hidden"
-            disabled={isLoading}
+            disabled={isLoading || uploadedImages.length >= 5}
           />
         </div>
         <button 
           onClick={handleSendMessage} 
-          disabled={!inputMessage.trim() && !uploadedImage || isLoading}
+          disabled={(!inputMessage.trim() && uploadedImages.length === 0) || isLoading}
           className="royal-btn px-4 py-3 rounded-lg min-w-[80px] flex items-center justify-center gap-2 flex-shrink-0"
         >
           {isLoading ? (
